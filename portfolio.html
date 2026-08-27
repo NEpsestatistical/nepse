@@ -5,6 +5,7 @@
 <title>NEPSE Portfolio</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="css/portfolio-3d.css" />
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   * { box-sizing: border-box; }
@@ -314,14 +315,34 @@
       <div class="total" id="totalValue">Rs 0</div>
       <div class="pl-row" id="totalPL"></div>
     </div>
-    <div style="display:flex; gap:8px; flex-wrap: wrap;">
-      <button class="btn primary label" id="importBtn">⇪ Import from Meroshare</button>
+    <div style="display:flex; gap:14px; flex-wrap: wrap; align-items:center;">
+      <button class="btn-3d btn-3d-1" id="importBtn" title="Import from Meroshare">
+        <span class="inner">
+          <svg viewBox="0 0 24 24"><path d="M12 3l5 5h-3v7h-4V8H7l5-5zM5 19h14v2H5v-2z"/></svg>
+          <span class="label">Import</span>
+        </span>
+      </button>
+      <button class="btn-3d btn-3d-2" id="unrealBtn" title="Stock P/L">
+        <span class="inner">
+          <svg viewBox="0 0 24 24"><path d="M3 3v18h18v-2H5V3H3zm16 4l-5 5-3-3-6 6 1.5 1.5L11 11l3 3 6.5-6.5L19 7z"/></svg>
+          <span class="label">Stock P/L</span>
+        </span>
+      </button>
+      <button class="btn-3d btn-3d-3" id="perfBtn" title="Realized Performance">
+        <span class="inner">
+          <svg viewBox="0 0 24 24"><path d="M5 19h14v2H5v-2zM7 15h2v-4H7v4zm4 0h2V7h-2v8zm4 0h2v-6h-2v6z"/></svg>
+          <span class="label">Performance</span>
+        </span>
+      </button>
+      <button class="btn-3d btn-3d-4" id="refreshBtn" title="Refresh prices">
+        <span class="inner">
+          <svg viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0020 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 004 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+          <span class="label">Refresh</span>
+        </span>
+      </button>
       <button class="btn label" id="txBtn">🧾 Transactions</button>
-      <button class="btn label" id="unrealBtn">📈 Stock P/L</button>
-      <button class="btn label" id="perfBtn">📊 Realized Performance</button>
       <button class="btn label" id="divBtn">💰 Dividends</button>
       <button class="btn label" id="sectorBtn">🧭 Sectors</button>
-      <button class="btn label" id="refreshBtn">↻ Refresh</button>
       <button class="btn label" id="settingsBtn">⚙</button>
     </div>
   </div>
@@ -2685,6 +2706,16 @@ document.addEventListener("visibilitychange", () => {
     if (target && !to) unsnap();
   });
 })();
+
+/* ---------- 3D button click pulse ---------- */
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".btn-3d");
+  if (!btn) return;
+  btn.classList.remove("pulse");
+  void btn.offsetWidth; // restart animation if clicked again quickly
+  btn.classList.add("pulse");
+  setTimeout(() => btn.classList.remove("pulse"), 500);
+});
 
 </script>
 </body>
