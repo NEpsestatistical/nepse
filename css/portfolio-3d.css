@@ -1,0 +1,96 @@
+/* portfolio-3d.css — 3D tilt/glow hover buttons, palette-matched to portfolio.html.
+   Structure per button:
+   <button class="btn-3d btn-3d-1">
+     <span class="inner">
+       <svg>...</svg>
+       <span class="label">Text</span>
+     </span>
+   </button>
+   Swap btn-3d-1..4 for a different accent color. Add class="pulse" briefly on
+   click (via JS) to trigger the pulse/glow animation. */
+
+:root {
+  --tc-accent1: #3FA796; /* teal — matches app's up/gain color */
+  --tc-accent2: #B497CF; /* purple — matches the target-cursor on-target color */
+  --tc-accent3: #D4A33A; /* gold — matches partial/lot-status tag color */
+  --tc-accent4: #C4553D; /* red — matches app's down/loss color */
+}
+
+.btn-3d {
+  background: none;
+  border: none;
+  padding: 0;
+  perspective: 1000px;
+  cursor: pointer;
+  position: relative;
+  font-family: 'Inter', sans-serif;
+}
+.btn-3d .inner {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid #2A3138;
+  border-radius: 10px;
+  height: 74px;
+  min-width: 120px;
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transform-style: preserve-3d;
+  transition: transform 0.35s cubic-bezier(0.18, 0.9, 0.32, 1), box-shadow 0.3s;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45);
+}
+.btn-3d:hover .inner {
+  transform: rotateX(10deg) rotateY(-8deg) translateY(-5px);
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.55);
+}
+.btn-3d:active .inner {
+  transform: translateY(1px) scale(0.97);
+}
+.btn-3d .label {
+  font-weight: 600;
+  font-size: 13px;
+  color: #EDEFF1;
+  white-space: nowrap;
+}
+.btn-3d svg {
+  width: 26px;
+  height: 26px;
+  fill: #EDEFF1;
+  flex-shrink: 0;
+  transition: transform 0.5s ease, fill 0.3s ease, filter 0.4s ease;
+  filter: drop-shadow(0 0 0 transparent);
+}
+
+/* Per-button accent backgrounds */
+.btn-3d-1 .inner { background: linear-gradient(145deg, #0A2420, #0F3A32); }
+.btn-3d-2 .inner { background: linear-gradient(145deg, #241a33, #3a2159); }
+.btn-3d-3 .inner { background: linear-gradient(145deg, #3a2c06, #5c4610); }
+.btn-3d-4 .inner { background: linear-gradient(145deg, #3a1712, #5c231a); }
+
+.btn-3d-1:hover svg { transform: scale(1.2) rotate(8deg); fill: var(--tc-accent1, #3FA796); filter: drop-shadow(0 0 8px #3FA796); }
+.btn-3d-2:hover svg { transform: scale(1.2) rotate(8deg); fill: var(--tc-accent2, #B497CF); filter: drop-shadow(0 0 8px #B497CF); }
+.btn-3d-3:hover svg { transform: scale(1.2) rotate(8deg); fill: var(--tc-accent3, #D4A33A); filter: drop-shadow(0 0 8px #D4A33A); }
+.btn-3d-4:hover svg { transform: scale(1.2) rotate(8deg); fill: var(--tc-accent4, #C4553D); filter: drop-shadow(0 0 8px #C4553D); }
+
+/* Click pulse — add/remove the "pulse" class via JS on click */
+.btn-3d.pulse svg {
+  animation: btn3dPulse 0.5s ease, btn3dGlow 0.5s ease;
+}
+@keyframes btn3dPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+@keyframes btn3dGlow {
+  0% { filter: drop-shadow(0 0 0 transparent); }
+  50% { filter: drop-shadow(0 0 12px currentColor); }
+  100% { filter: drop-shadow(0 0 0 transparent); }
+}
+
+@media (max-width: 640px) {
+  .btn-3d .inner { height: 60px; min-width: 100px; padding: 8px 12px; }
+  .btn-3d svg { width: 20px; height: 20px; }
+  .btn-3d .label { font-size: 11.5px; }
+}
