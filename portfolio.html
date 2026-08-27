@@ -2717,6 +2717,51 @@ document.addEventListener("click", (e) => {
   setTimeout(() => btn.classList.remove("pulse"), 500);
 });
 
+/* =========================================================
+   SUBTLE 3D STAT CARD TILT
+   ========================================================= */
+
+(function initPortfolio3D() {
+  const cards = document.querySelectorAll(".stats .stat");
+
+  if (!cards.length) return;
+
+  const reducedMotion =
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  if (reducedMotion) return;
+
+  cards.forEach((card) => {
+    card.addEventListener("pointermove", (e) => {
+      const rect = card.getBoundingClientRect();
+
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      const px = x / rect.width;
+      const py = y / rect.height;
+
+      const rotateY = (px - 0.5) * 6;
+      const rotateX = (0.5 - py) * 5;
+
+      card.style.setProperty("--mx", `${px * 100}%`);
+      card.style.setProperty("--my", `${py * 100}%`);
+
+      card.style.transform =
+        `perspective(900px)
+         rotateX(${rotateX}deg)
+         rotateY(${rotateY}deg)
+         translateY(-4px)
+         translateZ(10px)`;
+    });
+
+    card.addEventListener("pointerleave", () => {
+      card.style.transform =
+        "perspective(900px) translateZ(0)";
+    });
+  });
+})();
+
 </script>
 </body>
 </html>
