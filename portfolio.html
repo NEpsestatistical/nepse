@@ -554,6 +554,17 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUserId = null;
 
+sb.auth.onAuthStateChange((event, session) => {
+  const sessionUserId = session?.user?.id || null;
+  if (currentUserId && sessionUserId && sessionUserId !== currentUserId) {
+    // The session underneath this tab changed to a different account (e.g.
+    // signed in as someone else in another tab). Force a clean reload
+    // instead of silently mixing this tab's in-memory state with the new
+    // session's data.
+    location.reload();
+  }
+});
+
 function lgSetMsg(text, ok) {
   const el = document.getElementById("lgMsg");
   el.textContent = text || "";
@@ -723,7 +734,7 @@ function saveState() {
         current_portfolio_id: currentPortfolioId,
         schema_version: SCHEMA_VERSION,
         updated_at: new Date().toISOString(),
-      });
+      }, { onConflict: "user_id" });
     } catch (e) {
       console.error("Portfolio sync failed, kept locally:", e);
     }
