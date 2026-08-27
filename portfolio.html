@@ -294,6 +294,7 @@
     <div style="display:flex; gap:8px; flex-wrap: wrap;">
       <button class="btn primary label" id="importBtn">⇪ Import from Meroshare</button>
       <button class="btn label" id="txBtn">🧾 Transactions</button>
+      <button class="btn label" id="unrealBtn">📈 Stock P/L</button>
       <button class="btn label" id="perfBtn">📊 Realized Performance</button>
       <button class="btn label" id="divBtn">💰 Dividends</button>
       <button class="btn label" id="sectorBtn">🧭 Sectors</button>
@@ -404,6 +405,17 @@
       <button class="add-btn label" id="divAddBtn">+ Add Dividend</button>
     </div>
     <div class="stat-label label" style="margin-top:14px;">Total dividends received (this portfolio): <span id="divTotal" style="color:#EDEFF1; font-weight:600;">Rs 0</span></div>
+  </div>
+
+  <div class="panel" id="unrealPanel">
+    <h3>Unrealized P/L — By Stock</h3>
+    <p>Net profit or loss for each stock you currently hold, based on live price vs. your average cost. This is separate from Realized Performance, which only covers shares you've already sold.</p>
+    <table class="stock-perf-table">
+      <thead>
+        <tr><th>Symbol</th><th>Qty</th><th>Avg Cost</th><th>LTP</th><th>Cost Basis</th><th>Value</th><th>Net P/L</th><th>Return</th></tr>
+      </thead>
+      <tbody id="unrealBody"></tbody>
+    </table>
   </div>
 
   <div class="panel" id="sectorPanel">
@@ -1382,6 +1394,7 @@ async function refresh() {
     document.getElementById("lastUpdated").textContent = new Date().toLocaleTimeString() + " · refreshes every 30s (partial)";
   }
   render();
+  renderUnrealizedPanel();
 }
 
 /* ---------- Generic app modal (replaces native prompt/confirm/alert) ---------- */
@@ -2301,6 +2314,48 @@ function renderSectorBreakdown() {
     });
   }
 }
+
+function renderUnrealizedPanel() {
+  const panel = document.getElementById("unrealPanel");
+  if (!panel.classList.contains("show")) return; // no need to compute when hidden
+
+  const body = document.getElementById("unrealBody");
+  if (!holdings.length) {
+    body.innerHTML = '<tr><td colspan="8" class="empty-state">No current holdings yet.</td></tr>';
+    return;
+  }
+
+  const rows = holdings.map((h) => {
+    const p = prices[h.symbol];
+    const ltp = p ? p.ltp : null;
+    const cost = h.avgCost * h.qty;
+    const value = ltp !== null ? ltp * h.qty : null;
+    const pl = value !== null ? value - cost : null;
+    const plPct = pl !== null && cost > 0 ? (pl / cost) * 100 : null;
+    return { symbol: h.symbol, qty: h.qty, avgCost: h.avgCost, ltp, cost, value, pl, plPct };
+  });
+
+  // Biggest net gain/loss first so the extremes are easy to spot.
+  rows.sort((a, b) => (b.pl ?? -Infinity) - (a.pl ?? -Infinity));
+
+  body.innerHTML = rows.map((r) => `
+    <tr>
+      <td class="sym">${r.symbol}</td>
+      <td class="muted">${fmt(r.qty, 0)}</td>
+      <td class="muted">Rs ${fmt(r.avgCost, 2)}</td>
+      <td class="muted">${r.ltp !== null ? "Rs " + fmt(r.ltp, 2) : "—"}</td>
+      <td class="muted">Rs ${fmt(r.cost, 2)}</td>
+      <td class="muted">${r.value !== null ? "Rs " + fmt(r.value, 2) : "—"}</td>
+      <td class="${r.pl === null ? '' : (r.pl >= 0 ? 'up' : 'down')}">${r.pl === null ? "—" : (r.pl >= 0 ? "+" : "") + "Rs " + fmt(r.pl, 2)}</td>
+      <td class="${r.plPct === null ? '' : (r.plPct >= 0 ? 'up' : 'down')}">${r.plPct === null ? "—" : (r.plPct >= 0 ? "+" : "") + fmt(r.plPct, 2) + "%"}</td>
+    </tr>
+  `).join("");
+}
+
+document.getElementById("unrealBtn").addEventListener("click", () => {
+  document.getElementById("unrealPanel").classList.toggle("show");
+  renderUnrealizedPanel();
+});
 
 document.getElementById("sectorBtn").addEventListener("click", () => {
   document.getElementById("sectorPanel").classList.toggle("show");
