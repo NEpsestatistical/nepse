@@ -519,7 +519,7 @@
 
   <div class="table">
     <div class="row head">
-      <span>Symbol</span><span>Qty</span><span>Avg Cost</span><span>LTP</span><span>Value</span><span>P/L</span><span>Term</span><span>Est. Tax</span><span>Purchased</span><span></span>
+      <span>Symbol</span><span>Qty</span><span>Avg Cost</span><span>LTP</span><span>Value</span><span>P/L (Rs / %)</span><span>Term</span><span>Est. Tax</span><span>Purchased</span><span></span>
     </div>
     <div id="holdingsList"></div>
   </div>
@@ -1720,7 +1720,10 @@ function render() {
       <span class="muted">${fmt(h.avgCost, 2)}</span>
       <span class="${flashClass}">${ltp !== null ? fmt(ltp, 2) : "—"}</span>${staleSymbols.has(h.symbol) ? ' <span class="faint label" title="Last successful update — feed failed on the most recent refresh">stale</span>' : ""}
       <span>${value !== null ? "Rs " + fmt(value, 0) : "—"}</span>
-      <span class="${pl === null ? '' : (pl >= 0 ? 'up' : 'down')}">${pl === null ? "—" : (pl >= 0 ? "+" : "") + fmt(plPct, 1) + "%"}</span>
+      <span class="sym-cell">
+        <span class="${pl === null ? '' : (pl >= 0 ? 'up' : 'down')}">${pl === null ? "—" : (pl >= 0 ? "+" : "") + "Rs " + fmt(pl, 0)}</span>
+        <span class="${pl === null ? '' : (pl >= 0 ? 'up' : 'down')} label" style="font-size:11px;">${pl === null ? "" : (pl >= 0 ? "+" : "") + fmt(plPct, 1) + "%"}</span>
+      </span>
       <span>${termTag}</span>
       <span class="muted">${pl > 0 ? "Rs " + fmt(estTax, 0) : "—"}</span>
       <span class="faint label">${h.purchaseDate || "not set"}</span>
