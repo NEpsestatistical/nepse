@@ -256,9 +256,32 @@
   .lg-msg { font-size: 12px; color: #C4553D; margin-top: 10px; min-height: 14px; }
   .lg-msg.ok { color: #3FA796; }
   .lg-loading { font-size: 12.5px; color: #6B7680; }
+
+  /* Target cursor — vanilla JS/CSS version, no React needed.
+     Hides the default cursor and shows a ring that snaps to and
+     highlights any element with the "cursor-target" class. */
+  html.tc-active, html.tc-active * { cursor: none !important; }
+  #tcCursor {
+    position: fixed; top: 0; left: 0; width: 32px; height: 32px;
+    margin-left: -16px; margin-top: -16px;
+    border: 2px solid var(--tc-color, #ffffff);
+    border-radius: 8px; pointer-events: none; z-index: 9999;
+    transition: width .2s ease, height .2s ease, border-radius .2s ease,
+                border-color .2s ease, transform .05s linear, opacity .15s ease;
+    opacity: 0;
+  }
+  #tcCursor.tc-visible { opacity: 1; }
+  #tcCursor.tc-on-target { border-radius: 6px; }
+  #tcCursor::before {
+    content: ""; position: absolute; top: 50%; left: 50%;
+    width: 4px; height: 4px; margin: -2px 0 0 -2px;
+    background: var(--tc-color, #ffffff); border-radius: 50%;
+    transition: background .2s ease;
+  }
 </style>
 </head>
 <body>
+<div id="tcCursor"></div>
 <div id="loginGate">
   <div class="lg-box">
     <div class="lg-title">Sign in to your portfolio</div>
@@ -1235,7 +1258,14 @@ function finalizeImport(selectedClientId) {
 
   if (finalRows.length === 0) {
     status.className = "import-status err";
-    status.textContent = "Couldn't find recognizable columns in the file(s). Check the format or try manual entry below.";
+    if (pendingMeroshareRows.length && !trades.length && !pendingWaccRows.length) {
+      // We recognized a Meroshare Transaction History file, but it only has quantities —
+      // no price data — so it can't produce a cost basis on its own.
+      const seenSymbols = [...new Set(pendingMeroshareRows.map((r) => r.symbol))].join(", ");
+      status.textContent = `Found transaction history for ${seenSymbols || "your holdings"}, but it only has quantities — no prices — so avg cost can't be calculated from it alone. Also drop in your TMS Trade Book export (it has Buy/Sell prices) so holdings can be built, or add these manually below.`;
+    } else {
+      status.textContent = "Couldn't find recognizable columns in the file(s). Check the format or try manual entry below.";
+    }
     return;
   }
 
@@ -2599,6 +2629,63 @@ document.addEventListener("visibilitychange", () => {
     refreshIntervalId = setInterval(refresh, 30000);
   }
 });
+
+/* ---------- Target cursor (vanilla equivalent of a React TargetCursor) ----------
+   Options mirror the component you referenced: cursorColor, cursorColorOnTarget.
+   Works with dynamically-rendered buttons/tabs via a delegated mouseover listener,
+   so it doesn't need to be re-initialized after every render(). */
+(function initTargetCursor() {
+  const CURSOR_COLOR = "#ffffff";
+  const CURSOR_COLOR_ON_TARGET = "#B497CF";
+  const cursor = document.getElementById("tcCursor");
+  if (!cursor || window.matchMedia("(pointer: coarse)").matches) return; // skip on touch devices
+
+  document.documentElement.classList.add("tc-active");
+  document.documentElement.style.setProperty("--tc-color", CURSOR_COLOR);
+
+  let raf = null, targetX = 0, targetY = 0;
+  function moveCursor() {
+    cursor.style.transform = `translate(${targetX}px, ${targetY}px)`;
+    raf = null;
+  }
+  document.addEventListener("mousemove", (e) => {
+    targetX = e.clientX; targetY = e.clientY;
+    cursor.classList.add("tc-visible");
+    if (!raf) raf = requestAnimationFrame(moveCursor);
+  });
+  document.addEventListener("mouseleave", () => cursor.classList.remove("tc-visible"));
+
+  function snapTo(el) {
+    const r = el.getBoundingClientRect();
+    cursor.style.width = r.width + 12 + "px";
+    cursor.style.height = r.height + 12 + "px";
+    cursor.style.marginLeft = -(r.width + 12) / 2 + "px";
+    cursor.style.marginTop = -(r.height + 12) / 2 + "px";
+    cursor.style.transform = `translate(${r.left + r.width / 2}px, ${r.top + r.height / 2}px)`;
+    cursor.classList.add("tc-on-target");
+    cursor.style.setProperty("--tc-color", CURSOR_COLOR_ON_TARGET);
+    document.documentElement.style.setProperty("--tc-color", CURSOR_COLOR_ON_TARGET);
+  }
+  function unsnap() {
+    cursor.style.width = "32px";
+    cursor.style.height = "32px";
+    cursor.style.marginLeft = "-16px";
+    cursor.style.marginTop = "-16px";
+    cursor.classList.remove("tc-on-target");
+    document.documentElement.style.setProperty("--tc-color", CURSOR_COLOR);
+  }
+
+  document.addEventListener("mouseover", (e) => {
+    const target = e.target.closest(".cursor-target, .btn, .add-btn, .buy-btn, .sell-btn, .p-tab, .p-tab-add, input, select");
+    if (target) snapTo(target);
+  });
+  document.addEventListener("mouseout", (e) => {
+    const target = e.target.closest(".cursor-target, .btn, .add-btn, .buy-btn, .sell-btn, .p-tab, .p-tab-add, input, select");
+    const to = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest(".cursor-target, .btn, .add-btn, .buy-btn, .sell-btn, .p-tab, .p-tab-add, input, select") : null;
+    if (target && !to) unsnap();
+  });
+})();
+
 </script>
 </body>
 </html>
