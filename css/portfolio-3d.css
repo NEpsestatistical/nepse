@@ -94,3 +94,133 @@
   .btn-3d svg { width: 20px; height: 20px; }
   .btn-3d .label { font-size: 11.5px; }
 }
+
+/* ==========================================================================
+   Stock Holding 3D Tilt Card
+   Converted from SCSS to plain CSS, palette-matched to portfolio.html.
+
+   Structure per card:
+   <div class="stock-card stock-card-up" style="--url: url('/img/aapl-bg.jpg')">
+     <div class="stock-card-shadow"></div>
+     <div class="stock-card-image stock-card-background"></div>
+     <div class="stock-card-image stock-card-cutout"></div>
+     <div class="stock-card-content">
+       <h3>AAPL</h3>
+       <p>+2.4% today</p>
+     </div>
+   </div>
+
+   Tilt is driven by JS updating --rotateX / --rotateY on mousemove, e.g.:
+   const card = el;
+   card.addEventListener('mousemove', (e) => {
+     const r = card.getBoundingClientRect();
+     const px = (e.clientX - r.left) / r.width - 0.5;
+     const py = (e.clientY - r.top) / r.height - 0.5;
+     card.style.setProperty('--rotateY', `${px * 20}deg`);
+     card.style.setProperty('--rotateX', `${-py * 20}deg`);
+   });
+   card.addEventListener('mouseleave', () => {
+     card.style.setProperty('--rotateX', '0deg');
+     card.style.setProperty('--rotateY', '0deg');
+   });
+
+   Swap stock-card-up / stock-card-down / stock-card-neutral for the border +
+   glow accent color (uses the same --tc-accent1..4 palette as the buttons).
+   ========================================================================== */
+
+.stock-card {
+  --rotateX: 0deg;
+  --rotateY: 0deg;
+  position: relative;
+  height: 24rem;
+  width: 17rem;
+  aspect-ratio: 5 / 7;
+  color: #EDEFF1;
+  perspective: 50rem;
+  font-family: 'Inter', sans-serif;
+}
+
+.stock-card-shadow {
+  position: absolute;
+  inset: 0;
+  background: var(--url);
+  background-size: cover;
+  background-position: center;
+  opacity: 0.8;
+  filter: blur(2rem) saturate(0.9);
+  box-shadow: 0 -1.5rem 2rem -0.5rem rgba(0, 0, 0, 0.7);
+  transform: rotateX(var(--rotateX)) rotateY(var(--rotateY)) translate3d(0, 2rem, -2rem);
+}
+
+.stock-card-image {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55), transparent 40%), var(--url);
+  background-size: cover;
+  background-position: center;
+  mask-image: var(--url);
+  mask-size: cover;
+  mask-position: center;
+  -webkit-mask-image: var(--url);
+  -webkit-mask-size: cover;
+  -webkit-mask-position: center;
+}
+.stock-card-image.stock-card-background {
+  transform: rotateX(var(--rotateX)) rotateY(var(--rotateY)) translate3d(0, 0, 0);
+}
+.stock-card-image.stock-card-cutout {
+  transform: rotateX(var(--rotateX)) rotateY(var(--rotateY)) translate3d(0, 0, 4rem) scale(0.92);
+  z-index: 3;
+}
+
+.stock-card-content {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  inset: 0;
+  padding: 2rem;
+  transform: rotateX(var(--rotateX)) rotateY(var(--rotateY)) translate3d(0, 0, 6rem);
+  z-index: 4;
+}
+.stock-card-content h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0 0 0.35rem;
+  text-shadow: 0 0 2rem rgba(0, 0, 0, 0.6);
+}
+.stock-card-content p {
+  font-weight: 500;
+  font-size: 0.85rem;
+  margin: 0;
+  text-shadow: 0 0 2rem rgba(0, 0, 0, 0.6);
+}
+
+.stock-card::before,
+.stock-card::after {
+  content: "";
+  position: absolute;
+  inset: 1.25rem;
+  border: 0.35rem solid var(--tc-accent1, #3FA796);
+  transform: rotateX(var(--rotateX)) rotateY(var(--rotateY)) translate3d(0, 0, 2rem);
+}
+.stock-card::before { z-index: 4; }
+
+/* Accent per gain/loss state, reusing the app's existing palette */
+.stock-card-up::before,
+.stock-card-up::after { border-color: var(--tc-accent1, #3FA796); }
+.stock-card-down::before,
+.stock-card-down::after { border-color: var(--tc-accent4, #C4553D); }
+.stock-card-neutral::before,
+.stock-card-neutral::after { border-color: var(--tc-accent3, #D4A33A); }
+
+.stock-card.border-left-behind::before { border-left-color: transparent; }
+.stock-card.border-right-behind::before { border-right-color: transparent; }
+.stock-card.border-bottom-behind::before { border-bottom-color: transparent; }
+
+@media (max-width: 640px) {
+  .stock-card { height: 20rem; width: 14rem; }
+  .stock-card-content { padding: 1.25rem; }
+  .stock-card-content h3 { font-size: 0.95rem; }
+  .stock-card-content p { font-size: 0.75rem; }
+}
