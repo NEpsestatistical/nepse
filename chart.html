@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NEPSE Trading Chart</title>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<link rel="stylesheet" href="css/chart/base.css" />
+<link rel="stylesheet" href="css/chart/layout.css" />
+<link rel="stylesheet" href="css/chart/components.css" />
+<link rel="stylesheet" href="css/chart/indicators.css" />
+<link rel="stylesheet" href="css/chart/drawings.css" />
+<link rel="stylesheet" href="css/chart/multichart.css" />
+<link rel="stylesheet" href="css/chart/alerts.css" />
+<link rel="stylesheet" href="css/chart/replay.css" />
+<link rel="stylesheet" href="css/chart/phase10.css" />
+</head>
+<body>
+
+<div class="ntc-app">
+  <div class="ntc-system-bar">
+    <span class="ntc-health-dot" id="ntcFeedDot"></span>
+    <span class="ntc-connector-state" id="ntcFeedState">Market feed: checking…</span>
+    <span id="ntcAppVersion">NTC 10.0</span>
+    <span class="ntc-system-spacer"></span>
+    <button class="ntc-btn" id="ntcWorkspaceBtn">Workspace</button>
+    <button class="ntc-btn" id="ntcBrokerBtn">Broker / TMS</button>
+  </div>
+
+  <!-- LEFT icon rail -->
+  <div class="ntc-rail">
+    <button class="ntc-rail-icon active" id="ntcRailSearch" title="Symbol search (/)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </button>
+    <button class="ntc-rail-icon" id="ntcRailWatchlist" title="Watchlist">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="17" y2="13"/><line x1="7" y1="17" x2="13" y2="17"/></svg>
+    </button>
+  </div>
+
+  <!-- MAIN column -->
+  <div class="ntc-main-col">
+    <div class="ntc-top-bar">
+      <div>
+        <div class="ntc-sym-title" id="ntcSymTitle">—</div>
+        <div class="ntc-sym-meta" id="ntcSymMeta"></div>
+      </div>
+      <input type="text" id="ntcTopSearchInput" class="ntc-select" placeholder="Search symbol… (/)" style="width:160px;" readonly />
+      <div class="ntc-ohlc-inline">
+        <span>O <b id="ntcOhO">—</b></span>
+        <span>H <b id="ntcOhH">—</b></span>
+        <span>L <b id="ntcOhL">—</b></span>
+        <span>C <b id="ntcOhC">—</b></span>
+        <span>Vol <b id="ntcOhV">—</b></span>
+        <span class="ntc-ohlc-chg" id="ntcOhChg"></span>
+      </div>
+      <div class="ntc-spacer"></div>
+      <button class="ntc-btn ntc-indicator-btn" id="ntcIndicatorsBtn" title="Indicators">Indicators</button>
+      <button class="ntc-btn ntc-alert-btn" id="ntcAlertsBtn" title="Alerts">Alerts <span class="ntc-alert-count" id="ntcAlertCount">0</span></button>
+      <button class="ntc-btn ntc-paper-btn" id="ntcPaperBtn" title="Paper Trading">Paper Trading</button>
+      <button class="ntc-btn ntc-replay-btn" id="ntcReplayBtn" title="Historical Replay">Replay</button>
+      <select class="ntc-select ntc-layout-select" id="ntcLayoutSelect" title="Chart layout"></select>
+      <div class="ntc-sync-menu" id="ntcSyncMenu" title="Multi-chart synchronization">
+        <label><input type="checkbox" data-sync="symbol">Sym</label>
+        <label><input type="checkbox" data-sync="timeframe">TF</label>
+        <label><input type="checkbox" data-sync="crosshair">Cross</label>
+      </div>
+      <div class="ntc-draw-toolbar" id="ntcDrawToolbar">
+        <button class="ntc-btn" data-draw="cursor" title="Cursor">Cursor</button>
+        <button class="ntc-btn" data-draw="trend" title="Trend line">Trend</button>
+        <button class="ntc-btn" data-draw="ray" title="Ray">Ray</button>
+        <button class="ntc-btn" data-draw="horizontal" title="Horizontal line">H-Line</button>
+        <button class="ntc-btn" data-draw="vertical" title="Vertical line">V-Line</button>
+        <button class="ntc-btn" data-draw="rectangle" title="Rectangle">Rect</button>
+        <button class="ntc-btn" data-draw="fib" title="Fibonacci retracement">Fib</button>
+        <button class="ntc-btn" data-draw="measure" title="Measure price move">Measure</button>
+        <button class="ntc-btn" id="ntcDrawText" title="Add text">Text</button>
+        <button class="ntc-btn" id="ntcDrawUndo" title="Delete last drawing">Undo</button>
+        <button class="ntc-btn" id="ntcDrawHide" title="Hide/show drawings">Hide</button>
+        <button class="ntc-btn" id="ntcDrawLock" title="Lock/unlock drawings">Lock</button>
+        <button class="ntc-btn" id="ntcDrawClear" title="Clear drawings">Clear</button>
+      </div>
+      <div class="ntc-chart-controls">
+        <button class="ntc-btn" id="ntcFitBtn" title="Fit all data">Fit</button>
+        <button class="ntc-btn" id="ntcLogBtn" title="Logarithmic scale">Log</button>
+        <button class="ntc-btn" id="ntcPctBtn" title="Percentage scale">%</button>
+        <button class="ntc-btn" id="ntcInvertBtn" title="Invert scale">Invert</button>
+      </div>
+      <select class="ntc-select" id="ntcChartTypeSelect" title="Chart type"></select>
+    </div>
+
+    <div class="ntc-toolbar">
+      <div class="ntc-tf-row" id="ntcTfRow"></div>
+    </div>
+
+    <div class="ntc-active-inds" id="ntcActiveIndicators"></div>
+
+    <div class="ntc-chart-area" id="ntcChartArea">
+      <div class="ntc-chart-grid" id="ntcChartGrid"></div>
+      <div class="ntc-status" id="ntcStatus"><div id="ntcStatusText" class="ntc-status">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- RIGHT column: watchlist -->
+  <div class="ntc-right-col" id="ntcRightCol">
+    <div class="ntc-wl-tabs" id="ntcWlTabs"></div>
+    <div style="display:flex; gap:4px; padding:4px 10px 0;">
+      <button class="ntc-icon-btn" id="ntcWlAddTab" title="New watchlist">+</button>
+      <button class="ntc-icon-btn" id="ntcWlRenameBtn" title="Rename current watchlist">✎</button>
+      <button class="ntc-icon-btn" id="ntcWlDeleteBtn" title="Delete current watchlist">🗑</button>
+    </div>
+    <div class="ntc-wl-head">
+      <input type="text" id="ntcWlAddSymbolInput" placeholder="Add symbol…" />
+      <button class="ntc-icon-btn" id="ntcWlAddSymbolBtn" title="Add">+</button>
+    </div>
+    <div class="ntc-wl-table-head"><span>Symbol</span><span>Last</span><span>Chg%</span></div>
+    <div class="ntc-wl-list" id="ntcWlList"></div>
+  </div>
+
+</div>
+
+<!-- Symbol search modal -->
+<div class="ntc-modal-overlay" id="ntcSearchModal">
+  <div class="ntc-modal">
+    <div class="ntc-modal-head">
+      <input type="text" id="ntcSearchModalInput" placeholder="Search NEPSE symbol or company name…" />
+    </div>
+    <div class="ntc-modal-list" id="ntcSearchModalList"></div>
+    <div style="padding:8px 12px; border-top:1px solid var(--ntc-border); text-align:right;">
+      <button class="ntc-btn" id="ntcSearchModalClose">Close</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Indicator manager -->
+<div class="ntc-indicator-modal" id="ntcIndicatorModal">
+  <div class="ntc-indicator-box">
+    <div class="ntc-indicator-head">
+      <input id="ntcIndicatorSearch" placeholder="Search indicators…" />
+      <button class="ntc-btn" id="ntcIndicatorClose">Close</button>
+    </div>
+    <div class="ntc-indicator-body">
+      <div class="ntc-indicator-cats" id="ntcIndicatorCats"></div>
+      <div class="ntc-indicator-list" id="ntcIndicatorList"></div>
+    </div>
+    <div class="ntc-indicator-foot">
+      <button class="ntc-btn" id="ntcIndicatorClear">Clear all</button>
+    </div>
+  </div>
+</div>
+
+<!-- Alerts -->
+<div class="ntc-alert-modal" id="ntcAlertModal">
+  <div class="ntc-alert-box">
+    <div class="ntc-alert-head"><h3>Alerts</h3><span class="spacer"></span><button class="ntc-btn" id="ntcAlertClose">Close</button></div>
+    <div class="ntc-alert-body">
+      <div class="ntc-alert-form">
+        <select id="ntcAlertType"><option value="price">Price crosses</option><option value="crossover">Indicator crossover</option></select>
+        <input id="ntcAlertValue" placeholder="Price level" />
+        <select id="ntcAlertDirection"><option value="above">Above</option><option value="below">Below</option></select>
+        <button class="ntc-btn primary" id="ntcAlertAdd">Add alert</button>
+      </div>
+      <div class="ntc-alert-list" id="ntcAlertList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Rename / new-watchlist name prompt -->
+<div class="ntc-inline-prompt" id="ntcPrompt">
+  <div class="ntc-inline-prompt-box">
+    <div id="ntcPromptTitle" style="font-size:13px; font-weight:600;">Rename</div>
+    <input type="text" id="ntcPromptInput" />
+    <div class="row">
+      <button class="ntc-btn" id="ntcPromptCancel">Cancel</button>
+      <button class="ntc-btn primary" id="ntcPromptOk">OK</button>
+    </div>
+  </div>
+</div>
+
+<link rel="stylesheet" href="css/chart/paper.css">
+<!-- Historical Replay + Backtesting -->
+<div class="ntc-replay-modal" id="ntcReplayModal">
+  <div class="ntc-replay-box">
+    <div id="ntcReplayBody"></div>
+  </div>
+</div>
+
+<!-- Paper Trading -->
+<div class="ntc-paper-modal" id="ntcPaperModal">
+  <div class="ntc-paper-box">
+    <div class="ntc-paper-head"><h3>Paper Trading</h3><span class="spacer"></span><button class="ntc-btn" id="ntcPaperClose">Close</button></div>
+    <div class="ntc-paper-summary" id="ntcPaperSummary"></div>
+    <div class="ntc-paper-tabs">
+      <button class="ntc-btn active" data-paper-tab="order">Order</button><button class="ntc-btn" data-paper-tab="positions">Positions</button><button class="ntc-btn" data-paper-tab="orders">Orders</button><button class="ntc-btn" data-paper-tab="trades">Trade history</button><button class="ntc-btn" data-paper-tab="account">Account history</button>
+    </div>
+    <div class="ntc-paper-body" id="ntcPaperBody"></div>
+  </div>
+</div>
+<script src="js/chart/config.js"></script>
+<script src="js/chart/storage.js"></script>
+<script src="js/chart/state.js"></script>
+<script src="js/chart/datafeed.js"></script>
+<script src="js/chart/transforms.js"></script>
+<script src="js/chart/engine.js"></script>
+<script src="js/chart/drawings.js"></script>
+<script src="js/chart/indicators.js"></script>
+<script src="js/chart/watchlist.js"></script>
+<script src="js/chart/symbolsearch.js"></script>
+<script src="js/chart/toolbar.js"></script>
+<script src="js/chart/panels.js"></script>
+<script src="js/chart/layout-manager.js"></script>
+<script src="js/chart/alerts.js"></script>
+<script src="js/chart/paper-trading.js"></script>
+<script src="js/chart/replay.js"></script>
+<script src="js/chart/broker.js"></script>
+<script src="js/chart/app.js"></script>
+<!-- Phase 10 connector / workspace settings -->
+<div class="ntc-workspace-modal" id="ntcWorkspaceModal">
+  <div class="ntc-workspace-box">
+    <h3 id="ntcSettingsTitle">Workspace & Connector</h3>
+    <div class="ntc-workspace-grid">
+      <label class="full">Broker / TMS label<input id="ntcBrokerLabel" placeholder="e.g. My Broker TMS"></label>
+      <label class="full">Base API URL<input id="ntcBrokerBaseUrl" placeholder="https://example.com/api"></label>
+      <label>Health path<input id="ntcBrokerHealthPath" value="/"></label>
+      <label>Auth mode<select id="ntcBrokerAuthMode"><option value="bearer">Bearer token</option><option value="basic">Basic token</option></select></label>
+      <label class="full">Session secret (never saved)<input id="ntcBrokerSecret" type="password" autocomplete="off" placeholder="Optional API token for this browser session"></label>
+    </div>
+    <div class="ntc-workspace-actions">
+      <button class="ntc-btn" id="ntcExportWorkspace">Export workspace</button>
+      <button class="ntc-btn" id="ntcImportWorkspace">Import workspace</button>
+      <input type="file" id="ntcWorkspaceFile" accept="application/json" hidden>
+      <button class="ntc-btn" id="ntcBrokerDisconnect">Disconnect</button>
+      <button class="ntc-btn" id="ntcWorkspaceClose">Close</button>
+      <button class="ntc-btn primary" id="ntcBrokerSave">Save connector</button>
+      <button class="ntc-btn" id="ntcBrokerTest">Test connection</button>
+    </div>
+    <div class="ntc-workspace-note">The connector is a generic adapter because no broker-specific API contract or credentials were supplied. The base URL/label are saved locally; the session secret stays in memory and is cleared on page reload.</div>
+  </div>
+</div>
+<div class="ntc-error-toast" id="ntcErrorToast"></div>
+</body>
+</html>

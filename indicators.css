@@ -1,0 +1,24 @@
+
+/* Phase 2 indicator UI */
+.ntc-indicator-btn{margin-left:6px}
+.ntc-indicator-modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:50}
+.ntc-indicator-modal.show{display:flex}
+.ntc-indicator-box{width:min(760px,94vw);max-height:82vh;background:#1E222D;border:1px solid #2A2E39;border-radius:8px;box-shadow:0 20px 60px #0008;display:flex;flex-direction:column}
+.ntc-indicator-head{display:flex;gap:8px;padding:12px;border-bottom:1px solid #2A2E39}
+.ntc-indicator-head input{flex:1;background:#131722;border:1px solid #2A2E39;color:#D1D4DC;border-radius:4px;padding:8px}
+.ntc-indicator-body{display:grid;grid-template-columns:170px 1fr;min-height:400px}
+.ntc-indicator-cats{border-right:1px solid #2A2E39;padding:8px}
+.ntc-indicator-cat{display:block;width:100%;text-align:left;background:none;border:0;color:#A0A4AE;padding:8px;border-radius:4px;cursor:pointer}
+.ntc-indicator-cat.active,.ntc-indicator-cat:hover{background:#2A2E39;color:#fff}
+.ntc-indicator-list{padding:10px;overflow:auto}
+.ntc-ind-row{display:flex;align-items:center;justify-content:space-between;padding:9px;border-bottom:1px solid #252936}
+.ntc-ind-row .meta{font-size:11px;color:#787B86}
+.ntc-ind-row button{background:#2962FF;border:0;color:white;border-radius:4px;padding:5px 9px;cursor:pointer}
+.ntc-active-inds{padding:8px 12px;border-bottom:1px solid #2A2E39;display:flex;gap:6px;flex-wrap:wrap}
+.ntc-ind-chip{display:flex;gap:5px;align-items:center;background:#2A2E39;border:1px solid #3A3F4D;border-radius:14px;padding:4px 8px;font-size:11px}
+.ntc-ind-chip button{background:none;border:0;color:#AEB2BC;cursor:pointer;padding:0}
+.ntc-indicator-foot{padding:10px;text-align:right;border-top:1px solid #2A2E39}
+.ntc-indicator-pane{border-top:1px solid #2A2E39;background:#131722;position:relative;flex:0 0 204px}
+.ntc-indicator-pane-head{height:24px;padding:5px 10px;color:#9AA0AA;font-size:11px;background:#171A22}
+.ntc-indicator-pane-chart{height:180px}
+@media(max-width:800px){.ntc-indicator-body{grid-template-columns:1fr}.ntc-indicator-cats{display:flex;overflow:auto;border-right:0;border-bottom:1px solid #2A2E39}.ntc-indicator-cat{white-space:nowrap;width:auto}.ntc-indicator-box{max-height:92vh}}

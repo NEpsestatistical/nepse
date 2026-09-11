@@ -1,0 +1,40 @@
+/* NTC base.css — resets + typography, dark trading-terminal palette */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --ntc-bg: #131722;
+  --ntc-panel: #1E222D;
+  --ntc-border: #2A2E39;
+  --ntc-text: #D1D4DC;
+  --ntc-text-dim: #787B86;
+  --ntc-accent: #2962FF;
+  --ntc-accent-dim: #1A2B47;
+  --ntc-up: #26A69A;
+  --ntc-down: #EF5350;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; background: var(--ntc-bg); color: var(--ntc-text);
+  font-family: 'Inter', 'IBM Plex Mono', ui-monospace, monospace;
+}
+button, input, select { font-family: inherit; }
+button { cursor: pointer; }
+.ntc-mono { font-family: 'IBM Plex Mono', monospace; }
+.up { color: var(--ntc-up); }
+.down { color: var(--ntc-down); }
+
+.ntc-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--ntc-panel); border: 1px solid var(--ntc-border); color: var(--ntc-text);
+  padding: 6px 11px; border-radius: 4px; font-size: 12.5px;
+}
+.ntc-btn:hover:not(:disabled) { border-color: #434651; }
+.ntc-btn.active { background: var(--ntc-accent-dim); border-color: var(--ntc-accent); color: #5B9CF6; }
+.ntc-btn.primary { background: var(--ntc-accent); border-color: var(--ntc-accent); color: #fff; font-weight: 600; }
+.ntc-disabled, .ntc-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+select.ntc-select {
+  background: var(--ntc-panel); border: 1px solid var(--ntc-border); color: var(--ntc-text);
+  padding: 6px 9px; border-radius: 4px; font-size: 12.5px;
+}

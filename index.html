@@ -1,30 +1,493 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NEPSE Portfolio & Advanced Trading Chart</title>
-    <meta name="description" content="Professional NEPSE stock portfolio manager with an advanced TradingView-style interactive charting system featuring technical indicators, drawing tools, and Fibonacci retracements." />
-    <meta property="og:title" content="NEPSE Portfolio & Advanced Trading Chart" />
-    <meta property="og:description" content="Professional NEPSE stock portfolio manager with an advanced TradingView-style interactive charting system featuring technical indicators, drawing tools, and Fibonacci retracements." />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-  </head>
-  <body>
-    <script>
-      try {
-        if (window && window.fetch) {
-          const originalFetch = window.fetch;
-          Object.defineProperty(window, 'fetch', {
-            get: () => originalFetch,
-            set: () => {},
-            configurable: true
-          });
-        }
-      } catch (e) {}
-    </script>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+<head>
+<meta charset="UTF-8">
+<meta name="google-site-verification" content="NCbl5UBMCcDUeIVwaUk5B_vL5pGJD-7WPD8qa0A4CWs" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0E11">
+<title>Elite Elliott — Trader Network</title>
+<meta name="description" content="Elite Elliott is a social network for traders — post chart calls with sentiment and timeframe, track your win rate over time, follow other traders, and chat in real time.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://eliteelliottwave.netlify.app/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Elite Elliott">
+<meta property="og:title" content="Elite Elliott — Trader Network">
+<meta property="og:description" content="Post chart calls, track your win rate, and follow other traders — a social network built for traders.">
+<meta property="og:url" content="https://eliteelliottwave.netlify.app/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Elite Elliott — Trader Network">
+<meta name="twitter:description" content="Post chart calls, track your win rate, and follow other traders.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.85em' font-size='90'%3E%F0%9F%93%88%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
 
+<!-- ============= LOGIN GATE ============= -->
+<div class="login-gate" id="login-gate">
+  <div class="login-card">
+    <div class="mark" style="border-radius:14px; background:var(--gold); color:var(--gold-ink); display:flex; align-items:center; justify-content:center; font-weight:800;">EE</div>
+    <h2>Elite Elliott</h2>
+    <p>Connect with traders, share chart setups, and message your network — sign in to get started.</p>
+    <button class="gsi-btn" onclick="googleSignIn()">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16 19 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.4-4.6 2.3-7.2 2.3-5.3 0-9.6-3.4-11.2-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.6l6.2 5.2C40.5 36.4 44 30.9 44 24c0-1.3-.1-2.7-.4-3.5z"/></svg>
+      Continue with Google
+    </button>
+
+    <div class="login-divider"><span>or use your email</span></div>
+
+    <div class="email-login-form" id="email-login-form">
+      <input type="email" id="email-login-email" placeholder="Email address" autocomplete="email">
+      <input type="password" id="email-login-password" placeholder="Password" autocomplete="current-password">
+      <div class="email-login-actions">
+        <button class="btn btn-gold" style="flex:1; justify-content:center;" onclick="emailSignIn()">Sign in</button>
+        <button class="btn btn-ghost" style="flex:1; justify-content:center;" onclick="emailSignUp()">Create account</button>
+      </div>
+      <button class="email-forgot-link" onclick="emailForgotPassword()">Forgot password?</button>
+      <div class="email-login-msg" id="email-login-msg"></div>
+    </div>
+
+    <p class="login-note">Secure sign-in powered by Supabase Auth — your password is never stored in this browser or sent anywhere but Supabase. Use Google, or create an account / sign in with email below.</p>
+  </div>
+</div>
+
+<!-- USERNAME SETUP GATE (shown once, right after first sign-up) -->
+<div class="login-gate hide" id="username-gate">
+  <div class="login-card">
+    <div class="mark" style="border-radius:14px; background:var(--gold); color:var(--gold-ink); display:flex; align-items:center; justify-content:center; font-weight:800;">EE</div>
+    <h2>Choose your username</h2>
+    <p>Pick a display name and a unique username — this is how other traders will find and tag you.</p>
+
+    <div class="email-login-form">
+      <input type="text" id="ug-name" placeholder="Display name" maxlength="40">
+      <input type="text" id="ug-handle" placeholder="username" maxlength="20" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_]/g,'')">
+      <div class="email-login-actions">
+        <button class="btn btn-gold" style="flex:1; justify-content:center;" onclick="submitUsernameSetup()">Continue</button>
+      </div>
+      <div class="email-login-msg" id="ug-msg"></div>
+    </div>
+
+    <p class="login-note">Letters, numbers, and underscores only. You can change this later from Home.</p>
+  </div>
+</div>
+
+<div class="acct-overlay" id="acct-overlay">
+  <div class="acct-card">
+    <div class="acct-head">
+      <svg width="24" height="24" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16 19 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.4-4.6 2.3-7.2 2.3-5.3 0-9.6-3.4-11.2-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.6l6.2 5.2C40.5 36.4 44 30.9 44 24c0-1.3-.1-2.7-.4-3.5z"/></svg>
+      <h4>Add another account</h4>
+      <p>to continue to Elite Elliott</p>
+    </div>
+    <div id="acct-list"></div>
+    <div class="acct-other" onclick="toggleManualAcct()">
+      <div class="oi">＋</div>
+      <div class="an">Use another account</div>
+    </div>
+    <div class="acct-manual" id="acct-manual">
+      <input type="text" id="manual-name" placeholder="Full name" maxlength="30">
+      <input type="text" id="manual-email" placeholder="Email address" maxlength="50">
+      <button onclick="submitManualAccount()">Continue</button>
+    </div>
+    <div class="acct-foot">Add another account with a name + email (no password — use the email form on the previous screen for real login).</div>
+  </div>
+</div>
+
+<!-- ============= PASSWORD RESET OVERLAY (shown when user opens their reset-link) ============= -->
+<div class="acct-overlay" id="pw-reset-overlay">
+  <div class="pw-reset-card">
+    <h4>Set a new password</h4>
+    <p>You opened a password reset link. Enter a new password for your account below.</p>
+    <input type="password" id="pw-reset-input" placeholder="New password" autocomplete="new-password">
+    <button class="btn btn-gold" style="width:100%; justify-content:center;" onclick="submitPasswordReset()">Update password</button>
+    <div class="email-login-msg" id="pw-reset-msg" style="margin-top:8px;"></div>
+  </div>
+</div>
+
+<!-- ============= APP ============= -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="mark">EE</div>
+      <div><div class="name">Elite Elliott</div><div class="tag">Trader network</div></div>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn" id="bell-btn" onclick="onBellClick()" title="Friend requests"><span>🔔</span><span class="dot" id="bell-dot"></span></button>
+      <div class="avatar" id="my-avatar" onclick="openProfile(state.currentUser && state.currentUser.id)" title="View your profile"></div>
+    </div>
+  </div>
+  <nav class="tabs">
+    <button class="tab-btn" data-tab="home" onclick="showTab('home')">🏠 Home</button>
+    <button class="tab-btn active" data-tab="feed" onclick="showTab('feed')">📊 Feed</button>
+    <button class="tab-btn" data-tab="friends" onclick="showTab('friends')">👥 Friends<span class="tab-badge" id="friends-badge" style="display:none;"></span></button>
+    <button class="tab-btn" data-tab="messages" onclick="showTab('messages')">💬 Messages<span class="tab-badge" id="messages-badge" style="display:none;"></span></button>
+    <button class="tab-btn" data-tab="trending" onclick="showTab('trending')">🔥 Trending</button>
+    <button class="tab-btn" data-tab="nepal-news" onclick="showTab('nepal-news')">🇳🇵 Nepal News</button>
+    <button class="tab-btn" data-tab="world-news" onclick="showTab('world-news')">🌍 World News</button>
+    <button class="tab-btn" data-tab="portfolio" onclick="showTab('portfolio')">💼 Portfolio</button>
+    <button class="tab-btn" data-tab="chart" onclick="showTab('chart')">📈 Chart</button>
+    <button class="tab-btn" data-tab="dashboard" onclick="showTab('dashboard')">🧭 Dashboard</button>
+  </nav>
+</header>
+
+<div class="tape" id="tape"><div class="tape-track" id="tape-track"></div></div>
+
+<main>
+
+  <!-- HOME PANEL -->
+  <div class="panel" id="panel-home">
+    <div class="home-hero">
+      <canvas class="hero-bg-video" id="hero-bg-canvas"></canvas>
+      <div class="hero-bg-overlay"></div>
+      <div class="kicker">Trader Network</div>
+      <div class="logo3d-wrap">
+        <div class="logo3d">
+          <div class="edge"></div>
+          <div class="face front">EE</div>
+          <div class="face back">EE</div>
+        </div>
+      </div>
+      <h1>Trade at the speed of Elliott</h1>
+      <p>Elite Elliott is a complete trader network for posting chart calls, tracking win rate, following other traders and talking shop in real time — without switching between five different apps.</p>
+      <div class="hero-meta-row tagline-banner">FAST <b>•</b> SHARP <b>•</b> PROVEN</div>
+      <div class="hero-scroll-cue">Scroll</div>
+    </div>
+
+    <!-- ===== What can you do with Elite Elliott (LightWave-style feature panels) ===== -->
+    <div class="home-section" style="margin-bottom:8px;">
+      <div class="kicker" style="justify-content:center;">Trader Network</div>
+      <h2 style="text-align:center; font-size:clamp(24px,4vw,38px); font-weight:400; font-family:var(--font-display); text-transform:uppercase; margin:0 0 56px; color:var(--ink);">What can you do with Elite Elliott?</h2>
+
+      <div class="feature-panel">
+        <div class="fp-media">
+          <img src="https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1000&q=80" alt="Trader posting a chart call" loading="lazy">
+        </div>
+        <div class="fp-copy">
+          <div class="kicker">Call Your Shots</div>
+          <h3>Post chart calls with real conviction</h3>
+          <p>Share a ticker, a sentiment, and a timeframe — bullish, bearish or neutral — and put your read on the tape in front of the network.</p>
+          <p>Every call is timestamped and tracked, so your win rate speaks for itself instead of a highlight reel of your best trades.</p>
+        </div>
+      </div>
+
+      <div class="feature-panel rev">
+        <div class="fp-media">
+          <img src="https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1000&q=80" alt="Traders networking and following each other" loading="lazy">
+        </div>
+        <div class="fp-copy">
+          <div class="kicker">Build Your Circle</div>
+          <h3>Follow traders you actually rate</h3>
+          <p>Find setups worth watching, follow the people posting them, and build a feed that reflects the strategies and tickers you care about.</p>
+          <p>Mutual follows unlock direct messages, so the best conversations don't stay stuck in public replies.</p>
+        </div>
+      </div>
+
+      <div class="feature-panel">
+        <div class="fp-media">
+          <img src="https://images.unsplash.com/photo-1642052519154-77e15068ec7a?w=1000&q=80" alt="Real-time trading chat and market data" loading="lazy">
+        </div>
+        <div class="fp-copy">
+          <div class="kicker">Stay In The Loop</div>
+          <h3>Real-time chat, trending tickers &amp; news</h3>
+          <p>Message your network the moment a setup develops, track the tickers heating up across the feed, and pull in Nepal and world market news without leaving the app.</p>
+          <p>One place for the calls, the conversation and the context — no five-app juggling act.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== CTA banner ===== -->
+    <div class="cta-banner">
+      <div class="kicker">Trader Network</div>
+      <h2>Trade at the speed of Elliott</h2>
+      <button class="btn btn-gold" onclick="showTab('feed')">Enter The Feed</button>
+    </div>
+
+    <!-- ===== Testimonials ===== -->
+    <div class="home-section testimonial-strip">
+      <h3>What the network has to say about calling their shots on Elite Elliott.</h3>
+      <div class="testimonial-grid">
+        <div class="testimonial-card">
+          <div class="tq">Posting my calls publicly changed how I trade — I actually respect my own stop-loss now that my win rate is on display.</div>
+          <div class="ta"><b>@wavehunter</b>Swing trader, NQ &amp; ES</div>
+        </div>
+        <div class="testimonial-card">
+          <div class="tq">Found three traders on here whose reads are sharper than half the finance twitter accounts I used to follow.</div>
+          <div class="ta"><b>@delta_priya</b>Options trader</div>
+        </div>
+        <div class="testimonial-card">
+          <div class="tq">The trending tab is basically a heat-map of what the community is watching before it shows up anywhere else.</div>
+          <div class="ta"><b>@ktm_bull</b>Retail trader, Kathmandu</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="home-section">
+      <div class="section-title">Your account</div>
+      <div class="acct-security-card" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:12px;" id="home-acct-info"></div>
+        <button class="btn btn-outline-bear btn-sm" onclick="signOut()">Sign out</button>
+      </div>
+    </div>
+
+    <div class="home-section">
+      <div class="section-title">Edit profile</div>
+      <div class="acct-security-card">
+        <label style="display:block; font-size:12px; font-weight:700; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.4px;">Profile picture</label>
+        <div class="asc-row" style="align-items:center;">
+          <div id="home-avatar-preview"></div>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('avatar-file-input-home').click()">Upload photo</button>
+          <input type="file" id="avatar-file-input-home" accept="image/*" style="display:none" onchange="handleAvatarUpload(this.files[0])">
+        </div>
+        <label style="display:block; font-size:12px; font-weight:700; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.4px; margin-top:14px;">Display name</label>
+        <div class="asc-row">
+          <input type="text" id="home-edit-name" placeholder="Your name" maxlength="40">
+        </div>
+        <label style="display:block; font-size:12px; font-weight:700; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.4px; margin-top:12px;">Username</label>
+        <div class="asc-row">
+          <input type="text" id="home-edit-handle" placeholder="username" maxlength="20" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_]/g,'')">
+        </div>
+        <div style="margin-top:10px;"><button class="btn btn-gold btn-sm" onclick="saveProfileFromHome()">Save changes</button></div>
+        <div class="asc-note" id="home-edit-note">Letters, numbers, and underscores only. Your username must be unique.</div>
+      </div>
+    </div>
+
+    <div class="home-section">
+      <div class="section-title">Follow us</div>
+      <div class="social-grid" id="social-grid"></div>
+    </div>
+
+    <div class="home-section">
+      <div class="section-title">Account security</div>
+      <div class="acct-security-card">
+        <div class="asc-current" id="asc-current-email"></div>
+        <label style="display:block; font-size:12px; font-weight:700; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.4px; margin-top:12px;">Change password</label>
+        <div class="asc-row">
+          <input type="password" id="home-new-password" placeholder="New password">
+          <button class="btn btn-gold btn-sm" onclick="changePasswordFromHome()">Update</button>
+        </div>
+        <div class="asc-note">Your account and password are managed securely by Supabase Auth — this updates your real password immediately. Forgot it entirely? Sign out and use "Forgot password?" on the sign-in screen to get a reset link by email.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEED PANEL -->
+  <div class="panel active" id="panel-feed">
+    <div class="wl-card">
+      <div class="wl-head"><h4>Your Watchlist</h4><button class="icon-btn" style="width:28px; height:28px; font-size:13px;" onclick="renderWatchlist(true)" title="Refresh prices">↻</button></div>
+      <div class="wl-row" id="wl-row"></div>
+      <div class="wl-add">
+        <input type="text" id="wl-input" placeholder="Ticker, e.g. NVDA or RELIANCE.IN" maxlength="14" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter') addWatchTicker()">
+        <button class="btn btn-ghost btn-sm" onclick="addWatchTicker()">Add</button>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <div class="chip-row" id="filter-chips"></div>
+      <select class="sort-select" id="sort-select" onchange="setSort(this.value)">
+        <option value="newest">Newest</option>
+        <option value="top">Most Liked</option>
+      </select>
+    </div>
+    <div class="feed" id="feed"><div class="loading">Loading the feed…</div></div>
+  </div>
+
+  <!-- FRIENDS PANEL (discover & add new traders) -->
+  <div class="panel" id="panel-friends">
+    <div class="search-box">
+      <span>🔍</span>
+      <input type="text" id="friend-search" placeholder="Find traders by name or @username…" oninput="renderFriendsPanel()">
+    </div>
+    <div class="people-grid" id="suggested-grid"></div>
+  </div>
+
+  <!-- MESSAGES PANEL -->
+  <div class="panel" id="panel-messages">
+    <div id="convo-list"></div>
+  </div>
+
+  <!-- TRENDING PANEL -->
+  <div class="panel" id="panel-trending">
+    <div class="section-title">Trending tickers</div>
+    <p style="font-size:12.5px; color:var(--ink-dim); margin:-4px 0 14px;">Ranked by post activity and likes on Elite Elliott right now.</p>
+    <div class="trend-list" id="trend-list"></div>
+  </div>
+
+  <!-- NEPAL NEWS PANEL -->
+  <div class="panel" id="panel-nepal-news">
+    <div class="section-title">Nepal — latest headlines</div>
+    <div class="news-grid" id="nepal-news-grid"><div class="loading">Loading news…</div></div>
+  </div>
+
+  <!-- WORLD NEWS PANEL -->
+  <div class="panel" id="panel-world-news">
+    <div class="section-title">International headlines</div>
+    <div class="news-source-tabs" id="world-news-tabs"></div>
+    <div class="news-grid" id="world-news-grid"><div class="loading">Loading news…</div></div>
+  </div>
+
+  <!-- PORTFOLIO PANEL (embedded — merged from portfolio.html, no external file needed) -->
+  <div class="panel" id="panel-portfolio" style="padding:0;">
+    <iframe id="portfolio-frame" title="NEPSE Portfolio"
+      src="portfolio.html"
+      style="width:100%; height:85vh; min-height:640px; border:0; display:block; background:#0B0E11;"
+      loading="lazy"></iframe>
+  </div>
+
+  <!-- CHART PANEL -->
+  <div class="panel" id="panel-chart" style="padding:0;">
+    <div style="padding:10px 14px; text-align:right;">
+      <a href="chart.html" target="_blank" rel="noopener" style="color:#2962FF; font-weight:600; text-decoration:none;">Open Chart ↗</a>
+    </div>
+    <iframe id="chart-frame" title="NEPSE Chart"
+      src="chart_2.html"
+      style="width:100%; height:85vh; min-height:640px; border:0; display:block; background:#0B0E11;"
+      loading="lazy"></iframe>
+  </div>
+
+  <!-- DASHBOARD PANEL -->
+  <div class="panel" id="panel-dashboard" style="padding:0;">
+    <iframe id="dashboard-frame" title="NEPSE Dashboard"
+      src="dashboard.html"
+      style="width:100%; height:85vh; min-height:640px; border:0; display:block; background:#0B0E11;"
+      loading="lazy"></iframe>
+  </div>
+
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="brand"><div class="mark">EE</div><div><div class="name">Elite Elliott</div><div class="tag">Trader network</div></div></div>
+      <p>A social network for traders — post chart calls, track your win rate, follow other traders and talk shop in real time.</p>
+    </div>
+    <div class="footer-col">
+      <h5>Explore</h5>
+      <ul>
+        <li><a href="#" onclick="showTab('feed');return false;">Feed</a></li>
+        <li><a href="#" onclick="showTab('trending');return false;">Trending</a></li>
+        <li><a href="#" onclick="showTab('friends');return false;">Find traders</a></li>
+        <li><a href="#" onclick="showTab('world-news');return false;">World News</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h5>Account</h5>
+      <ul>
+        <li><a href="#" onclick="showTab('home');return false;">Your account</a></li>
+        <li><a href="#" onclick="showTab('messages');return false;">Messages</a></li>
+        <li><a href="#" onclick="signOut();return false;">Sign out</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div>© <span id="footer-year"></span> Elite Elliott. All rights reserved.</div>
+    <div class="footer-social">
+      <a href="#" title="Twitter / X">𝕏</a>
+      <a href="#" title="Instagram">◎</a>
+      <a href="#" title="YouTube">▶</a>
+    </div>
+  </div>
+</footer>
+
+<button class="fab" onclick="openNewPost()">＋ Post Chart</button>
+
+<div class="overlay-bg" id="overlay-bg" onclick="closeModals()"></div>
+
+<!-- NEW POST MODAL -->
+<div class="modal" id="new-post-modal">
+  <div class="modal-head"><h3>Post a Chart</h3><button class="close-x" onclick="closeModals()">✕</button></div>
+  <div class="modal-body">
+    <div class="field">
+      <label>Chart Image</label>
+      <label class="drop-zone" id="drop-zone" for="file-input">
+        <div class="dz-label" id="dz-label"><span class="em">📊</span>Tap to upload a chart screenshot<br><span style="text-decoration:underline;">or drag &amp; drop an image here</span></div>
+      </label>
+      <input type="file" id="file-input" accept="image/*" style="display:none" onchange="handleFile(this.files[0])">
+    </div>
+    <div class="field"><label>Ticker</label><input type="text" id="in-ticker" placeholder="e.g. AAPL, BTCUSD" maxlength="12" oninput="this.value=this.value.toUpperCase()"></div>
+    <div class="field">
+      <label>Timeframe</label>
+      <div class="tf-grid" id="tf-grid"></div>
+    </div>
+    <div class="field">
+      <label>Sentiment</label>
+      <div class="seg-control" id="sent-control">
+        <div class="seg-btn" data-s="bullish" onclick="selectSentiment('bullish')">▲ Bullish</div>
+        <div class="seg-btn" data-s="neutral" onclick="selectSentiment('neutral')">● Neutral</div>
+        <div class="seg-btn" data-s="bearish" onclick="selectSentiment('bearish')">▼ Bearish</div>
+      </div>
+    </div>
+    <div class="field"><label>Analysis / Caption</label><textarea id="in-caption" placeholder="What's your read on this setup?"></textarea></div>
+    <div class="field"><label>Posting as</label><div class="static-val" id="posting-as"></div></div>
+    <button class="btn btn-gold" style="width:100%; justify-content:center; padding:13px;" id="submit-btn" onclick="submitPost()">Post to Feed</button>
+  </div>
+</div>
+
+<!-- POST DETAIL MODAL -->
+<div class="modal" id="detail-modal">
+  <div class="modal-head"><h3>Chart Post</h3><button class="close-x" onclick="closeModals()">✕</button></div>
+  <div class="modal-body" id="detail-body"></div>
+</div>
+
+<!-- USER PROFILE MODAL -->
+<div class="modal" id="profile-modal">
+  <div class="modal-head"><h3>Trader Profile</h3><button class="close-x" onclick="closeModals()">✕</button></div>
+  <div class="modal-body" id="profile-body"></div>
+</div>
+
+<!-- SIGN OUT CONFIRM MODAL -->
+<div class="modal" id="signout-modal" style="max-width:360px;">
+  <div class="modal-head">
+    <h3>Sign out</h3>
+    <button class="close-x" onclick="closeSignoutModal()">✕</button>
+  </div>
+  <div class="modal-body" style="padding:22px 20px 4px; text-align:center;">
+    <div style="font-size:36px; margin-bottom:10px;">👋</div>
+    <p style="color:var(--ink-dim); font-size:14px; margin:0 0 4px;">Sign out of Elite Elliott?</p>
+    <p style="color:var(--ink-faint); font-size:12.5px; margin:0;">You can sign back in anytime with the same account.</p>
+  </div>
+  <div class="modal-foot" style="display:flex; gap:10px; padding:16px 20px 20px;">
+    <button class="btn btn-ghost" style="flex:1; justify-content:center;" onclick="closeSignoutModal()">Cancel</button>
+    <button class="btn btn-outline-bear" style="flex:1; justify-content:center;" onclick="confirmSignOut()">Sign out</button>
+  </div>
+</div>
+
+<!-- CHAT MODAL -->
+<div class="modal" id="chat-modal">
+  <div class="modal-head">
+    <div class="mh-info">
+      <div class="avatar sm" id="chat-avatar"></div>
+      <div><h3 id="chat-name"></h3><div class="mh-sub" id="chat-sub"></div></div>
+    </div>
+    <button class="close-x" onclick="closeModals()">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="chat-thread" id="chat-thread"></div>
+  </div>
+  <div class="modal-foot">
+    <input type="text" id="chat-input" placeholder="Message…" onkeydown="if(event.key==='Enter') sendChatMessage()">
+    <button class="icon-btn" style="background:var(--gold); border-color:var(--gold); color:var(--gold-ink);" onclick="sendChatMessage()">➤</button>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox(event)">✕</button>
+  <img id="lightbox-img" src="" alt="Full size chart">
+</div>
+
+<div class="toast" id="toast"></div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/core.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/market.js"></script>
+<script src="js/feed.js"></script>
+<script src="js/social.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/hero.js"></script>
+</body>
+</html>

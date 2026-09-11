@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>NEPSE Chart</title>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; background: #131722; color: #D1D4DC;
+    font-family: 'Inter', 'IBM Plex Mono', ui-monospace, monospace;
+  }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+  button { font-family: inherit; cursor: pointer; }
+
+  /* ---------- App shell: left icon rail + main + right watchlist ---------- */
+  .app { display: flex; height: 100vh; }
+
+  /* LEFT icon rail */
+  .rail {
+    width: 52px; flex-shrink: 0; background: #1E222D; border-right: 1px solid #2A2E39;
+    display: flex; flex-direction: column; align-items: center; padding: 10px 0; gap: 2px;
+  }
+  .rail .rail-icon {
+    width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+    border-radius: 6px; color: #787B86; margin-bottom: 2px;
+  }
+  .rail .rail-icon svg { width: 19px; height: 19px; }
+  .rail .rail-icon.active { background: #2962FF22; color: #2962FF; }
+  .rail .rail-icon:hover { color: #D1D4DC; background: #2A2E39; }
+  .rail .rail-sep { width: 26px; height: 1px; background: #2A2E39; margin: 6px 0; }
+  .rail .rail-spacer { flex: 1; }
+
+  /* MAIN column */
+  .main-col { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+  .top-bar {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    background: #131722; border-bottom: 1px solid #2A2E39; padding: 8px 14px; font-size: 13px;
+  }
+  .symbol-row { display: flex; align-items: center; gap: 8px; }
+  .symbol-row input {
+    background: #1E222D; border: 1px solid #2A2E39; border-radius: 4px; padding: 6px 9px;
+    color: #D1D4DC; font-family: inherit; font-size: 13px; font-weight: 600; width: 100px; text-transform: uppercase;
+  }
+  .symbol-row input:focus { outline: none; border-color: #2962FF; }
+  .btn { display: flex; align-items: center; gap: 6px; background: #1E222D; border: 1px solid #2A2E39; color: #D1D4DC; padding: 6px 11px; border-radius: 4px; font-size: 12.5px; }
+  .btn:hover { border-color: #434651; }
+  .btn.primary { background: #2962FF; border-color: #2962FF; color: #fff; font-weight: 600; }
+  .btn.active { background: #1A2B47; border-color: #2962FF; color: #5B9CF6; }
+
+  .instrument-title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; color: #D1D4DC; }
+  .instrument-title .dot { width: 7px; height: 7px; border-radius: 50%; background: #26A69A; }
+  .instrument-title .meta { font-size: 12px; color: #787B86; font-weight: 500; }
+
+  .ohlc-inline { display: flex; gap: 10px; font-size: 12.5px; color: #787B86; flex-wrap: wrap; }
+  .ohlc-inline b { color: #D1D4DC; font-weight: 600; }
+  .ohlc-inline .up { color: #26A69A; } .ohlc-inline .down { color: #EF5350; }
+
+  .top-bar .spacer { flex: 1; }
+  .range-row { display: flex; gap: 4px; flex-wrap: wrap; }
+  .range-row .btn { padding: 5px 10px; font-size: 12px; }
+
+  .toolbar {
+    display: flex; align-items: center; gap: 6px; padding: 6px 14px; flex-wrap: wrap;
+    background: #131722; border-bottom: 1px solid #2A2E39;
+  }
+  .toolbar .sep { width: 1px; height: 20px; background: #2A2E39; margin: 0 4px; }
+  .tool-btn { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; background: transparent; border: 1px solid transparent; color: #787B86; border-radius: 4px; padding: 0; }
+  .tool-btn:hover { background: #1E222D; color: #D1D4DC; }
+  .tool-btn.active { background: #1A2B47; color: #5B9CF6; }
+  .tool-btn svg { width: 15px; height: 15px; }
+  .tool-btn.danger:hover { color: #EF5350; }
+  .ind-btn { padding: 5px 10px; font-size: 11px; border-radius: 4px; background: #1E222D; }
+  .tool-hint { display: none; margin-left: 8px; font-size: 11.5px; color: #5B9CF6; }
+
+  /* chart area */
+  .chart-area { flex: 1; position: relative; padding: 8px 0 0; display:flex; flex-direction:column; min-height:0; }
+  .chart-stack { position: relative; flex-shrink: 0; }
+  #chart { width: 100%; height: 440px; }
+  #volChart { width: 100%; height: 80px; }
+  #rsiChart { width: 100%; height: 100px; display: none; }
+  #macdChart { width: 100%; height: 100px; display: none; }
+  .subpane-label { font-size: 11px; color: #787B86; padding: 3px 14px 0; }
+
+  #drawCanvas { position: absolute; top: 0; left: 0; pointer-events: none; }
+  .chart-stack.drawing-mode #drawCanvas { pointer-events: auto; cursor: crosshair; }
+  #chartStatus { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: #131722; z-index: 8; }
+  #chartStatus.show { display: flex; }
+  .status { font-size: 13px; color: #787B86; text-align: center; padding: 60px 20px; }
+  .status.err { color: #EF5350; }
+
+  /* floating price tags like TV SELL/BUY boxes */
+  .price-tags { position: absolute; top: 10px; left: 14px; z-index: 5; display: flex; gap: 6px; }
+  .price-tag { border-radius: 3px; padding: 6px 12px; text-align: center; font-family:'IBM Plex Mono',monospace; }
+  .price-tag .lbl { font-size: 9px; letter-spacing: .04em; opacity: .85; display:block; }
+  .price-tag .val { font-size: 15px; font-weight: 700; }
+  .price-tag.sell { background: #EF5350; color: #fff; }
+  .price-tag.buy { background: #2962FF; color: #fff; }
+  .vol-badge { position:absolute; top: 14px; left: 14px; z-index:5; font-size:11px; color:#787B86; font-family:'IBM Plex Mono',monospace; display:none; }
+
+  /* legend box top-left (below price tags), TradingView style */
+  .legend-box { position: absolute; top: 62px; left: 14px; z-index: 4; display: flex; flex-direction: column; gap: 2px; pointer-events: none; }
+  .legend-row { display: flex; gap: 8px; align-items: baseline; }
+  .legend-title { font-weight: 700; color: #D1D4DC; font-size: 13px; }
+  .legend-sub { color: #787B86; font-size: 11px; }
+  .legend-vals span { margin-right: 8px; color: #B2B5BE; font-size: 12px; font-family:'IBM Plex Mono',monospace; }
+  .legend-vals b { font-weight: 600; }
+  .legend-vals .up { color: #26A69A; } .legend-vals .down { color: #EF5350; }
+  .legend-ind { display: flex; gap: 8px; flex-wrap: wrap; }
+  .legend-ind span { font-size: 11px; font-family:'IBM Plex Mono',monospace; }
+
+  .footer-note { font-size: 10.5px; color: #4A5158; padding: 8px 14px; text-align: center; }
+
+  /* ---------- RIGHT column: watchlist + symbol info panel ---------- */
+  .right-col { width: 300px; flex-shrink: 0; background: #131722; border-left: 1px solid #2A2E39; display: flex; flex-direction: column; overflow-y: auto; }
+  .wl-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #2A2E39; }
+  .wl-head-title { display:flex; align-items:center; gap:6px; font-size: 13px; font-weight: 600; color:#D1D4DC; }
+  .wl-head-title svg { width:13px; height:13px; color:#787B86; }
+  .wl-icon-btn { color:#787B86; width:26px; height:26px; display:flex; align-items:center; justify-content:center; border-radius:4px; }
+  .wl-icon-btn:hover { background:#1E222D; color:#D1D4DC; }
+
+  .wl-table-head { display: grid; grid-template-columns: 1.5fr 1fr 0.9fr 0.9fr; padding: 6px 14px; font-size: 10.5px; color: #565A64; border-bottom: 1px solid #1E222D; }
+  .wl-table-head span:not(:first-child) { text-align: right; }
+
+  .wl-row { position: relative; display: grid; grid-template-columns: 1.5fr 1fr 0.9fr 0.9fr; align-items: center; padding: 8px 14px; font-size: 12.5px; cursor: pointer; border-bottom: 1px solid #1A1E27; }
+  .wl-row:hover { background: #1A1E27; }
+  .wl-remove {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+    width: 18px; height: 18px; border-radius: 3px; display: none;
+    align-items: center; justify-content: center; color: #787B86; background: #2A2E39;
+  }
+  .wl-remove:hover { color: #EF5350; background: #33202080; }
+  .wl-row:hover .wl-remove { display: flex; }
+  .wl-row:hover .wl-chgpct { padding-right: 20px; }
+  .wl-row.active { background: #1A2B47; }
+  .wl-sym { display: flex; align-items: center; gap: 7px; font-weight: 600; color: #D1D4DC; }
+  .wl-sym .glyph { width:18px; height:18px; border-radius:4px; background:#2A2E39; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:#9598A1; flex-shrink:0; }
+  .wl-last { text-align: right; font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
+  .wl-chg, .wl-chgpct { text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+  .up { color: #26A69A; } .down { color: #EF5350; }
+  .wl-row.selected-symbol { background: #1A2B47; }
+  .wl-row.selected-symbol .wl-sym { color: #5B9CF6; }
+
+  /* symbol info panel (below watchlist, like screenshot) */
+  .info-panel { border-top: 1px solid #2A2E39; padding: 14px; }
+  .info-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .info-sym-row { display: flex; align-items: center; gap: 8px; }
+  .info-sym-row .glyph { width: 26px; height: 26px; border-radius: 6px; background: #2A2E39; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #9598A1; }
+  .info-sym-row .name { font-size: 14px; font-weight: 700; color: #D1D4DC; }
+  .info-icons { display: flex; gap: 4px; color: #787B86; }
+  .info-icons span { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 4px; }
+  .info-icons span:hover { background: #1E222D; color: #D1D4DC; }
+
+  .info-link { font-size: 12px; color: #787B86; margin-bottom: 2px; }
+  .info-link a { color: #5B9CF6; text-decoration: none; }
+  .info-cat { font-size: 11.5px; color: #565A64; margin-bottom: 12px; }
+
+  .info-price-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+  .info-price { font-size: 30px; font-weight: 700; color: #D1D4DC; font-family: 'IBM Plex Mono', monospace; }
+  .info-ccy { font-size: 12px; color: #787B86; font-weight: 600; }
+  .info-chg { font-size: 13px; font-weight: 600; }
+
+  .info-status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #26A69A; margin-bottom: 12px; }
+  .info-status .dot { width: 6px; height: 6px; border-radius: 50%; background: #26A69A; }
+
+  .info-pills { display: flex; gap: 8px; margin-bottom: 14px; }
+  .info-pill { flex: 1; text-align: center; padding: 6px 8px; border-radius: 4px; font-size: 13px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
+  .info-pill.sell { background: rgba(239,83,80,.12); color: #EF5350; }
+  .info-pill.buy { background: rgba(41,98,255,.12); color: #5B9CF6; }
+
+  .info-range-row { display: flex; justify-content: space-between; font-size: 11.5px; color: #787B86; margin-bottom: 6px; font-family:'IBM Plex Mono',monospace; }
+  .info-range-bar { position: relative; height: 4px; border-radius: 3px; background: linear-gradient(90deg,#26A69A,#EF5350); margin-bottom: 4px; }
+  .info-range-bar .marker { position: absolute; top: -3px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #D1D4DC; }
+
+  .news-card { border-top: 1px solid #2A2E39; padding: 14px; }
+  .news-head { font-size: 11px; color: #787B86; margin-bottom: 8px; }
+  .news-title { font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 4px; color: #D1D4DC; }
+  .news-body { font-size: 11.5px; color: #9598A1; line-height: 1.5; }
+  .news-more { font-size: 11.5px; color: #5B9CF6; margin-top: 8px; display:block; }
+
+  /* bottom bar */
+  .bottom-bar { display: flex; align-items: center; gap: 10px; padding: 6px 14px; background: #131722; border-top: 1px solid #2A2E39; font-size: 12px; color: #787B86; }
+  .bottom-bar .btn { padding: 5px 10px; font-size: 12px; }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #2A2E39; border-radius: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- LEFT ICON RAIL -->
+  <div class="rail">
+    <div class="rail-icon active" title="Cursor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 3l7 17 2-7 7-2-16-8z"/></svg></div>
+    <div class="rail-icon" title="Line tools"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/><line x1="6.5" y1="17.5" x2="17.5" y2="6.5"/></svg></div>
+    <div class="rail-icon" title="Measure"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="9" width="18" height="6" rx="1"/><line x1="7" y1="9" x2="7" y2="12"/><line x1="11" y1="9" x2="11" y2="12"/><line x1="15" y1="9" x2="15" y2="12"/></svg></div>
+    <div class="rail-icon" title="Zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg></div>
+    <div class="rail-icon" title="Text"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4,7 4,4 20,4 20,7"/><line x1="12" y1="4" x2="12" y2="20"/><line x1="9" y1="20" x2="15" y2="20"/></svg></div>
+    <div class="rail-sep"></div>
+    <div class="rail-icon" title="Magnet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h4v9a2 2 0 004 0V3h4v9a6 6 0 01-12 0V3z"/></svg></div>
+    <div class="rail-icon" title="Lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="9" rx="1"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></div>
+    <div class="rail-icon" title="Hide drawings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></div>
+    <div class="rail-icon danger" id="railDelete" title="Remove drawings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></div>
+    <div class="rail-spacer"></div>
+    <div class="rail-icon" title="Favorites"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 15,9 22,9.5 17,14.5 18.5,22 12,18 5.5,22 7,14.5 2,9.5 9,9"/></svg></div>
+  </div>
+
+  <!-- MAIN COLUMN -->
+  <div class="main-col">
+    <div class="top-bar">
+      <div class="symbol-row">
+        <input type="text" id="symbolInput" value="RAWA" placeholder="SYMBOL" />
+        <button class="btn primary" id="loadBtn">↻ Load</button>
+      </div>
+      <div class="instrument-title">
+        <span class="dot"></span>
+        <span id="badgeSymbol">RAWA</span>
+        <span class="meta">· NEPSE · Equity · 1D</span>
+      </div>
+      <div class="ohlc-inline mono" id="ohlcInline">
+        <span>O<b id="ohO">—</b></span>
+        <span>H<b id="ohH">—</b></span>
+        <span>L<b id="ohL">—</b></span>
+        <span>C<b id="ohC">—</b></span>
+        <span id="ohChgWrap">Chg <b id="ohChg">—</b></span>
+        <span>Vol<b id="ohV">—</b></span>
+      </div>
+      <div class="spacer"></div>
+      <div class="range-row" id="rangeRow">
+        <button class="btn" data-days="90">3M</button>
+        <button class="btn" data-days="180">6M</button>
+        <button class="btn active" data-days="365">1Y</button>
+        <button class="btn" data-days="730">2Y</button>
+        <button class="btn" data-days="0">All</button>
+      </div>
+    </div>
+
+    <div class="toolbar" id="toolbar">
+      <button class="tool-btn active" id="toolCursor" title="Cursor / Select" data-tool="cursor">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 3l7 17 2-7 7-2-16-8z"/></svg>
+      </button>
+      <button class="tool-btn" id="toolTrend" title="Trendline" data-tool="trend">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/><line x1="6.5" y1="17.5" x2="17.5" y2="6.5"/></svg>
+      </button>
+      <button class="tool-btn" id="toolFib" title="Fibonacci Retracement" data-tool="fib">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="5" x2="21" y2="5"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="3" y1="20" x2="21" y2="20"/></svg>
+      </button>
+      <button class="tool-btn" id="toolElliottImpulse" title="Elliott Impulse Wave (0-1-2-3-4-5)" data-tool="elliottImpulse">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 18 L6 6 L10 15 L14 3 L18 13 L22 9"/><circle cx="2" cy="18" r="1.4" fill="currentColor" stroke="none"/><circle cx="14" cy="3" r="1.4" fill="currentColor" stroke="none"/><circle cx="22" cy="9" r="1.4" fill="currentColor" stroke="none"/></svg>
+      </button>
+      <button class="tool-btn" id="toolElliottCorrective" title="Elliott Corrective Wave (0-A-B-C)" data-tool="elliottCorrective">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 8 L9 19 L15 9 L22 16"/><circle cx="2" cy="8" r="1.4" fill="currentColor" stroke="none"/><circle cx="22" cy="16" r="1.4" fill="currentColor" stroke="none"/></svg>
+      </button>
+      <button class="tool-btn" id="toolHline" title="Horizontal Ray" data-tool="hline">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><circle cx="6" cy="12" r="2" fill="currentColor"/></svg>
+      </button>
+      <button class="tool-btn" id="toolText" title="Text Label" data-tool="text">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4,7 4,4 20,4 20,7"/><line x1="12" y1="4" x2="12" y2="20"/><line x1="9" y1="20" x2="15" y2="20"/></svg>
+      </button>
+      <button class="tool-btn danger" id="toolClear" title="Clear all drawings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+      </button>
+      <div class="sep"></div>
+      <button class="btn ind-btn" data-ind="ma20" id="indMA20">MA 20</button>
+      <button class="btn ind-btn" data-ind="ma50" id="indMA50">MA 50</button>
+      <button class="btn ind-btn" data-ind="ema9" id="indEMA9">EMA 9</button>
+      <button class="btn ind-btn" data-ind="bb" id="indBB">Bollinger</button>
+      <button class="btn ind-btn" data-ind="rsi" id="indRSI">RSI</button>
+      <button class="btn ind-btn" data-ind="macd" id="indMACD">MACD</button>
+      <span id="toolHint" class="tool-hint"></span>
+    </div>
+
+    <div class="chart-area">
+      <div class="chart-stack" id="chartStack">
+        <div id="chart"></div>
+        <div class="price-tags">
+          <div class="price-tag sell"><span class="lbl">SELL</span><span class="val" id="sellPriceTag">—</span></div>
+          <div class="price-tag buy"><span class="lbl">BUY</span><span class="val" id="buyPriceTag">—</span></div>
+        </div>
+        <div class="legend-box" id="legendBox">
+          <div class="legend-row">
+            <span class="legend-title" id="legTitle">RAWA</span>
+            <span class="legend-sub">D · NEPSE</span>
+          </div>
+          <div class="legend-vals mono" id="legVals">
+            <span>O <b id="lgO">—</b></span><span>H <b id="lgH">—</b></span>
+            <span>L <b id="lgL">—</b></span><span>C <b id="lgC">—</b></span>
+            <span id="lgChg"></span>
+          </div>
+          <div class="legend-ind" id="legendInd"></div>
+        </div>
+        <canvas id="drawCanvas"></canvas>
+        <div id="chartStatus"><div class="status" id="chartStatusText"></div></div>
+      </div>
+      <div class="subpane-label">Volume</div>
+      <div id="volChart"></div>
+      <div class="subpane-label" id="rsiLabel" style="display:none;">RSI (14)</div>
+      <div id="rsiChart"></div>
+      <div class="subpane-label" id="macdLabel" style="display:none;">MACD (12, 26, 9)</div>
+      <div id="macdChart"></div>
+      <div class="footer-note">
+        Daily OHLC, proxied through a Worker from nepsetrading.com's public chart feed — unofficial, verify before trading decisions.
+      </div>
+    </div>
+
+    <div class="bottom-bar">
+      <span>Paper Trading</span>
+      <div class="spacer" style="flex:1"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN: watchlist + info panel -->
+  <div class="right-col">
+    <div class="wl-head">
+      <div class="wl-head-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h7"/></svg>
+        Watchlist
+      </div>
+      <div style="display:flex; gap:2px;">
+        <div class="wl-icon-btn" id="wlAddBtn" title="Add symbol"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        <div class="wl-icon-btn" id="wlResetBtn" title="Reset to default watchlist"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></div>
+      </div>
+    </div>
+    <div class="wl-table-head">
+      <span>Symbol</span><span>Last</span><span>Chg</span><span>Chg%</span>
+    </div>
+    <div id="watchlistBody"></div>
+
+    <div class="info-panel">
+      <div class="info-panel-head">
+        <div class="info-sym-row">
+          <div class="glyph" id="infoGlyph">RA</div>
+          <div class="name" id="infoSymName">RAWA</div>
+        </div>
+        <div class="info-icons">
+          <span title="Grid"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span>
+          <span title="Edit"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></span>
+          <span title="More"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></span>
+        </div>
+      </div>
+      <div class="info-link">NEPSE listed equity</div>
+      <div class="info-cat">Equity · NEPSE</div>
+
+      <div class="info-price-row">
+        <span class="info-price" id="infoPrice">—</span>
+        <span class="info-ccy">NPR</span>
+        <span class="info-chg" id="infoChg"></span>
+      </div>
+      <div class="info-status"><span class="dot"></span><span id="marketStatus">Market open</span></div>
+
+      <div class="info-pills">
+        <div class="info-pill sell" id="infoSell">—</div>
+        <div class="info-pill buy" id="infoBuy">—</div>
+      </div>
+
+      <div class="info-range-row"><span id="dayLow">—</span><span>Day's range</span><span id="dayHigh">—</span></div>
+      <div class="info-range-bar"><div class="marker" id="rangeMarker" style="left:50%;"></div></div>
+    </div>
+
+    <div class="news-card">
+      <div class="news-head">NEWS · JUST NOW</div>
+      <div class="news-title">Chart tools updated</div>
+      <div class="news-body">Toggle MA / EMA / Bollinger overlays and RSI / MACD panels from the toolbar. Drawings persist per-symbol in your browser.</div>
+      <span class="news-more">More events ›</span>
+    </div>
+  </div>
+</div>
+
+<script>
+const WORKER_URL = "https://nepsechart.bharatiaashish43.workers.dev";
+const DEFAULT_WATCHLIST = ["RAWA","NABIL","NLIC","NICA","HIDCL","UPPER"];
+const WATCHLIST_KEY = "ee_watchlist_v1";
+function loadWatchlist() {
+  try {
+    const raw = localStorage.getItem(WATCHLIST_KEY);
+    const list = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(list) && list.length) return list;
+  } catch {}
+  return [...DEFAULT_WATCHLIST];
+}
+function saveWatchlist(list) {
+  try { localStorage.setItem(WATCHLIST_KEY, JSON.stringify(list)); } catch {}
+}
+let WATCHLIST_SYMBOLS = loadWatchlist();
+
+let allCandles = [];
+let chart, series, volChart, volSeries, rsiChart, rsiSeries, macdChart, macdLineSeries, macdSignalSeries, macdHistSeries;
+let maSeries = {};
+let bbSeries = {};
+let rangeDays = 365;
+let currentSymbol = "";
+let activeIndicators = new Set();
+
+// ---------- Indicator math ----------
+function sma(candles, period) {
+  const out = [];
+  for (let i = 0; i < candles.length; i++) {
+    if (i < period - 1) continue;
+    let sum = 0;
+    for (let j = i - period + 1; j <= i; j++) sum += candles[j].close;
+    out.push({ time: candles[i].time, value: sum / period });
+  }
+  return out;
+}
+function ema(candles, period) {
+  const out = [];
+  const k = 2 / (period + 1);
+  let prev;
+  candles.forEach((c, i) => {
+    if (i === 0) { prev = c.close; } else { prev = c.close * k + prev * (1 - k); }
+    if (i >= period - 1) out.push({ time: c.time, value: prev });
+  });
+  return out;
+}
+function bollinger(candles, period = 20, mult = 2) {
+  const mid = sma(candles, period);
+  const upper = [], lower = [];
+  for (let i = period - 1; i < candles.length; i++) {
+    let sum = 0;
+    for (let j = i - period + 1; j <= i; j++) sum += candles[j].close;
+    const mean = sum / period;
+    let variance = 0;
+    for (let j = i - period + 1; j <= i; j++) variance += Math.pow(candles[j].close - mean, 2);
+    const sd = Math.sqrt(variance / period);
+    upper.push({ time: candles[i].time, value: mean + mult * sd });
+    lower.push({ time: candles[i].time, value: mean - mult * sd });
+  }
+  return { mid, upper, lower };
+}
+function rsi(candles, period = 14) {
+  const out = [];
+  let gains = 0, losses = 0;
+  for (let i = 1; i < candles.length; i++) {
+    const diff = candles[i].close - candles[i - 1].close;
+    const gain = Math.max(diff, 0), loss = Math.max(-diff, 0);
+    if (i <= period) {
+      gains += gain; losses += loss;
+      if (i === period) {
+        const rs = losses === 0 ? 100 : gains / (losses || 1e-9);
+        out.push({ time: candles[i].time, value: 100 - 100 / (1 + rs) });
+      }
+      continue;
+    }
+    gains = (gains * (period - 1) + gain) / period;
+    losses = (losses * (period - 1) + loss) / period;
+    const rs = losses === 0 ? 100 : gains / (losses || 1e-9);
+    out.push({ time: candles[i].time, value: 100 - 100 / (1 + rs) });
+  }
+  return out;
+}
+function emaSeriesFromValues(values, period) {
+  const k = 2 / (period + 1);
+  const out = [];
+  let prev;
+  values.forEach((v, i) => {
+    if (i === 0) prev = v.value; else prev = v.value * k + prev * (1 - k);
+    out.push({ time: v.time, value: prev });
+  });
+  return out;
+}
+function macd(candles) {
+  const ema12 = ema(candles, 12);
+  const ema26 = ema(candles, 26);
+  const off = ema12.length - ema26.length;
+  const macdLine = ema26.map((v, i) => ({ time: v.time, value: ema12[i + off].value - v.value }));
+  const signal = emaSeriesFromValues(macdLine, 9);
+  const soff = macdLine.length - signal.length;
+  const hist = signal.map((v, i) => ({ time: v.time, value: macdLine[i + soff].value - v.value, color: (macdLine[i + soff].value - v.value) >= 0 ? "rgba(38,166,154,.7)" : "rgba(239,83,80,.7)" }));
+  return { macdLine, signal, hist };
+}
+
+// ---------- Drawing tools ----------
+const drawCanvas = document.getElementById("drawCanvas");
+const chartStack = document.getElementById("chartStack");
+const dctx = drawCanvas.getContext("2d");
+let drawings = [];
+let activeTool = "cursor";
+let pendingPoints = [];
+let hoverPoint = null;
+
+const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+const FIB_COLORS = ["#787B86", "#26A69A", "#5AC8A8", "#E8C468", "#E89A68", "#EF5350", "#787B86"];
+const ELLIOTT_LABELS = {
+  elliottImpulse: ["0", "1", "2", "3", "4", "5"],
+  elliottCorrective: ["0", "A", "B", "C"],
+};
+const TOOL_POINT_COUNTS = { trend: 2, fib: 2, elliottImpulse: 6, elliottCorrective: 4, hline: 1, text: 1 };
+const MULTI_POINT_TOOLS = ["trend", "fib", "elliottImpulse", "elliottCorrective"];
+
+function storageKey(sym) { return "ee_drawings_" + sym; }
+function loadDrawings(sym) {
+  try { const raw = localStorage.getItem(storageKey(sym)); drawings = raw ? JSON.parse(raw) : []; }
+  catch { drawings = []; }
+}
+function saveDrawings() {
+  try { localStorage.setItem(storageKey(currentSymbol), JSON.stringify(drawings)); } catch {}
+}
+const TOOL_HINTS = {
+  trend: "Click a start point, then an end point on the chart · Esc to cancel",
+  fib: "Click the swing high/low, then the other end to plot Fibonacci levels · Esc to cancel",
+  hline: "Click anywhere on the chart to drop a horizontal ray",
+  text: "Click on the chart, then type your label",
+  elliottImpulse: "Plot points 0 → 1 → 2 → 3 → 4 → 5 for a 5-wave impulse · Esc to cancel",
+  elliottCorrective: "Plot points 0 → A → B → C for an ABC correction · Esc to cancel",
+};
+function updateToolHint() {
+  const el = document.getElementById("toolHint");
+  if (!el) return;
+  if (activeTool === "cursor") { el.textContent = ""; el.style.display = "none"; return; }
+  const need = TOOL_POINT_COUNTS[activeTool] || 1;
+  let text = TOOL_HINTS[activeTool] || "";
+  if (need > 1 && pendingPoints.length > 0 && pendingPoints.length < need) {
+    const labels = ELLIOTT_LABELS[activeTool];
+    const nextLabel = labels ? labels[pendingPoints.length] : null;
+    text = `Click point ${pendingPoints.length + 1} of ${need}` + (nextLabel ? ` (wave ${nextLabel})` : "") + " · Esc to cancel";
+  }
+  el.textContent = text;
+  el.style.display = text ? "inline" : "none";
+}
+function setActiveTool(tool) {
+  activeTool = tool;
+  pendingPoints = [];
+  document.querySelectorAll(".tool-btn[data-tool]").forEach((b) => b.classList.toggle("active", b.dataset.tool === tool));
+  chartStack.classList.toggle("drawing-mode", tool !== "cursor");
+  updateToolHint();
+  redrawOverlay();
+}
+function resizeCanvas() {
+  const rect = document.getElementById("chart").getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  drawCanvas.width = rect.width * dpr;
+  drawCanvas.height = rect.height * dpr;
+  drawCanvas.style.width = rect.width + "px";
+  drawCanvas.style.height = rect.height + "px";
+  dctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  redrawOverlay();
+}
+function timeToX(time) { return chart.timeScale().timeToCoordinate(time); }
+function priceToY(price) { return series.priceToCoordinate(price); }
+function xToTime(x) { return chart.timeScale().coordinateToTime(x); }
+function yToPrice(y) { return series.coordinateToPrice(y); }
+
+function drawLine(x1, y1, x2, y2, color, width = 1.5, dash = []) {
+  dctx.save(); dctx.strokeStyle = color; dctx.lineWidth = width; dctx.setLineDash(dash);
+  dctx.beginPath(); dctx.moveTo(x1, y1); dctx.lineTo(x2, y2); dctx.stroke(); dctx.restore();
+}
+function drawDot(x, y, color) {
+  dctx.save(); dctx.fillStyle = color; dctx.beginPath(); dctx.arc(x, y, 3.5, 0, Math.PI * 2); dctx.fill(); dctx.restore();
+}
+function drawLabel(x, y, text, color) {
+  dctx.save(); dctx.font = "11px 'IBM Plex Mono', monospace"; dctx.fillStyle = color; dctx.textBaseline = "middle";
+  dctx.fillText(text, x + 6, y); dctx.restore();
+}
+function drawWaveLabel(x, y, text, color) {
+  dctx.save();
+  dctx.font = "700 12px 'IBM Plex Mono', monospace";
+  dctx.fillStyle = color;
+  dctx.textAlign = "center";
+  dctx.textBaseline = "bottom";
+  dctx.fillText(text, x, y - 8);
+  dctx.restore();
+}
+function redrawOverlay() {
+  if (!chart || !series) return;
+  const rect = document.getElementById("chart").getBoundingClientRect();
+  dctx.clearRect(0, 0, rect.width, rect.height);
+  drawings.forEach((d) => renderDrawing(d, rect));
+  if (pendingPoints.length && MULTI_POINT_TOOLS.includes(activeTool)) {
+    // instant feedback for every point already placed, even before the mouse moves again
+    pendingPoints.forEach((p) => {
+      const x = timeToX(p.time), y = priceToY(p.price);
+      if (x !== null && y !== null) drawDot(x, y, "#5B9CF6");
+    });
+  }
+  if (pendingPoints.length && hoverPoint && MULTI_POINT_TOOLS.includes(activeTool)) {
+    const preview = { type: activeTool, points: [...pendingPoints, hoverPoint] };
+    renderDrawing(preview, rect, true);
+  }
+}
+function renderDrawing(d, rect, isPreview = false) {
+  const alpha = isPreview ? 0.6 : 1;
+  if (d.type === "trend") {
+    const [p1, p2] = d.points;
+    const x1 = timeToX(p1.time), y1 = priceToY(p1.price), x2 = timeToX(p2.time), y2 = priceToY(p2.price);
+    if (x1 === null || y1 === null || x2 === null || y2 === null) return;
+    dctx.globalAlpha = alpha; drawLine(x1, y1, x2, y2, "#26A69A", 1.75);
+    if (!isPreview) { drawDot(x1, y1, "#26A69A"); drawDot(x2, y2, "#26A69A"); }
+    dctx.globalAlpha = 1;
+  } else if (d.type === "fib") {
+    const [p1, p2] = d.points;
+    const x1 = timeToX(p1.time), y1 = priceToY(p1.price), x2 = timeToX(p2.time), y2 = priceToY(p2.price);
+    if (x1 === null || y1 === null || x2 === null || y2 === null) return;
+    const rightEdge = Math.max(x1, x2, rect.width);
+    dctx.globalAlpha = alpha;
+    FIB_LEVELS.forEach((lvl, i) => {
+      const price = p1.price + (p2.price - p1.price) * lvl;
+      const y = priceToY(price);
+      if (y === null) return;
+      drawLine(Math.min(x1, x2), y, isPreview ? Math.max(x1, x2) : rightEdge, y, FIB_COLORS[i], 1, i === 0 || i === 6 ? [] : [4, 3]);
+      drawLabel(Math.min(x1, x2), y, lvl.toFixed(3) + "  " + price.toFixed(2), FIB_COLORS[i]);
+    });
+    drawLine(x1, y1, x2, y2, "#787B8688", 1, [2, 2]);
+    dctx.globalAlpha = 1;
+  } else if (d.type === "hline") {
+    const p = d.points[0]; const y = priceToY(p.price);
+    if (y === null) return;
+    drawLine(0, y, rect.width, y, "#E8C468", 1.5, [6, 3]);
+    drawLabel(rect.width - 90, y, p.price.toFixed(2), "#E8C468");
+  } else if (d.type === "text") {
+    const p = d.points[0]; const x = timeToX(p.time), y = priceToY(p.price);
+    if (x === null || y === null) return;
+    dctx.save(); dctx.font = "600 12px 'Inter', sans-serif"; dctx.fillStyle = "#D1D4DC";
+    dctx.fillText(d.text, x, y); dctx.restore();
+  } else if (d.type === "elliottImpulse" || d.type === "elliottCorrective") {
+    const labels = ELLIOTT_LABELS[d.type];
+    const color = d.type === "elliottImpulse" ? "#5B9CF6" : "#E89A68";
+    const pts = d.points.map((p) => ({ x: timeToX(p.time), y: priceToY(p.price) }));
+    if (pts.some((p) => p.x === null || p.y === null)) return;
+    dctx.globalAlpha = alpha;
+    for (let i = 0; i < pts.length - 1; i++) drawLine(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y, color, 1.75);
+    pts.forEach((p, i) => {
+      if (!isPreview || i < pts.length - 1) drawDot(p.x, p.y, color);
+      const lbl = labels[i];
+      if (lbl !== undefined) drawWaveLabel(p.x, p.y, lbl, color);
+    });
+    dctx.globalAlpha = 1;
+  }
+}
+function commitDrawing(type, points, text) {
+  drawings.push({ type, points, text: text || "" });
+  saveDrawings(); pendingPoints = []; redrawOverlay();
+}
+drawCanvas.addEventListener("mousemove", (e) => {
+  const rect = drawCanvas.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  const time = xToTime(x), price = yToPrice(y);
+  if (time === null || price === null) return;
+  hoverPoint = { time, price };
+  if (pendingPoints.length) redrawOverlay();
+});
+drawCanvas.addEventListener("click", (e) => {
+  if (activeTool === "cursor") return;
+  const rect = drawCanvas.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  const time = xToTime(x), price = yToPrice(y);
+  if (time === null || price === null) return;
+  if (activeTool === "hline") { commitDrawing("hline", [{ time, price }]); return; }
+  if (activeTool === "text") {
+    const text = prompt("Label text:");
+    if (text) commitDrawing("text", [{ time, price }], text); else pendingPoints = [];
+    return;
+  }
+  pendingPoints.push({ time, price });
+  updateToolHint();
+  const need = TOOL_POINT_COUNTS[activeTool] || 2;
+  if (pendingPoints.length >= need) { commitDrawing(activeTool, pendingPoints); updateToolHint(); }
+  else redrawOverlay();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && pendingPoints.length) {
+    pendingPoints = [];
+    updateToolHint();
+    redrawOverlay();
+  }
+});
+document.getElementById("toolbar").addEventListener("click", (e) => {
+  const toolBtn = e.target.closest(".tool-btn");
+  if (toolBtn) {
+    if (toolBtn.id === "toolClear") {
+      if (confirm("Clear all drawings for " + currentSymbol + "?")) { drawings = []; saveDrawings(); redrawOverlay(); }
+      return;
+    }
+    // clicking the already-active drawing tool again switches back to cursor
+    if (toolBtn.dataset.tool === activeTool && activeTool !== "cursor") {
+      setActiveTool("cursor");
+      return;
+    }
+    setActiveTool(toolBtn.dataset.tool);
+    return;
+  }
+  const indBtn = e.target.closest(".ind-btn");
+  if (indBtn) toggleIndicator(indBtn.dataset.ind, indBtn);
+});
+document.getElementById("railDelete").addEventListener("click", () => {
+  if (confirm("Clear all drawings for " + currentSymbol + "?")) { drawings = []; saveDrawings(); redrawOverlay(); }
+});
+new ResizeObserver(resizeCanvas).observe(document.getElementById("chart"));
+
+function fmt(n, d = 2) {
+  if (n === null || n === undefined || Number.isNaN(n)) return "—";
+  return n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+
+// ---------- Indicator toggling ----------
+function toggleIndicator(key, btn) {
+  if (activeIndicators.has(key)) { activeIndicators.delete(key); btn.classList.remove("active"); }
+  else { activeIndicators.add(key); btn.classList.add("active"); }
+
+  const rsiEl = document.getElementById("rsiChart");
+  const macdEl = document.getElementById("macdChart");
+  rsiEl.style.display = activeIndicators.has("rsi") ? "block" : "none";
+  document.getElementById("rsiLabel").style.display = activeIndicators.has("rsi") ? "block" : "none";
+  macdEl.style.display = activeIndicators.has("macd") ? "block" : "none";
+  document.getElementById("macdLabel").style.display = activeIndicators.has("macd") ? "block" : "none";
+
+  if (allCandles.length) applyRange();
+
+  // Panes created while display:none have 0 width/height cached inside
+  // lightweight-charts and never receive a resize event automatically.
+  // Force a layout pass on the very next frame so they actually render.
+  requestAnimationFrame(() => {
+    if (activeIndicators.has("rsi") && rsiChart) {
+      rsiChart.applyOptions({ width: rsiEl.clientWidth, height: rsiEl.clientHeight || 100 });
+      rsiChart.timeScale().fitContent();
+    }
+    if (activeIndicators.has("macd") && macdChart) {
+      macdChart.applyOptions({ width: macdEl.clientWidth, height: macdEl.clientHeight || 100 });
+      macdChart.timeScale().fitContent();
+    }
+  });
+}
+function clearOverlaySeries() {
+  Object.values(maSeries).forEach((s) => chart.removeSeries(s));
+  Object.values(bbSeries).forEach((s) => chart.removeSeries(s));
+  maSeries = {}; bbSeries = {};
+}
+function applyIndicators(candles) {
+  clearOverlaySeries();
+  const legendInd = document.getElementById("legendInd");
+  legendInd.innerHTML = "";
+  if (activeIndicators.has("ma20") && candles.length > 20) {
+    maSeries.ma20 = chart.addLineSeries({ color: "#E8C468", lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false });
+    maSeries.ma20.setData(sma(candles, 20));
+    legendInd.innerHTML += '<span style="color:#E8C468">MA20</span>';
+  }
+  if (activeIndicators.has("ma50") && candles.length > 50) {
+    maSeries.ma50 = chart.addLineSeries({ color: "#9B8CE8", lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false });
+    maSeries.ma50.setData(sma(candles, 50));
+    legendInd.innerHTML += '<span style="color:#9B8CE8">MA50</span>';
+  }
+  if (activeIndicators.has("ema9") && candles.length > 9) {
+    maSeries.ema9 = chart.addLineSeries({ color: "#5AC8A8", lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false });
+    maSeries.ema9.setData(ema(candles, 9));
+    legendInd.innerHTML += '<span style="color:#5AC8A8">EMA9</span>';
+  }
+  if (activeIndicators.has("bb") && candles.length > 20) {
+    const b = bollinger(candles, 20, 2);
+    bbSeries.upper = chart.addLineSeries({ color: "#787B86", lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+    bbSeries.mid = chart.addLineSeries({ color: "#9598A1", lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
+    bbSeries.lower = chart.addLineSeries({ color: "#787B86", lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+    bbSeries.upper.setData(b.upper); bbSeries.mid.setData(b.mid); bbSeries.lower.setData(b.lower);
+    legendInd.innerHTML += '<span style="color:#9598A1">BB(20,2)</span>';
+  }
+  if (activeIndicators.has("rsi") && candles.length > 15) rsiSeries.setData(rsi(candles, 14));
+  else rsiSeries.setData([]);
+  if (activeIndicators.has("macd") && candles.length > 35) {
+    const m = macd(candles);
+    macdLineSeries.setData(m.macdLine); macdSignalSeries.setData(m.signal); macdHistSeries.setData(m.hist);
+  } else { macdLineSeries.setData([]); macdSignalSeries.setData([]); macdHistSeries.setData([]); }
+}
+
+// ---------- Legend ----------
+function updateLegend(candle) {
+  if (!candle) return;
+  document.getElementById("lgO").textContent = fmt(candle.open);
+  document.getElementById("lgH").textContent = fmt(candle.high);
+  document.getElementById("lgL").textContent = fmt(candle.low);
+  document.getElementById("lgC").textContent = fmt(candle.close);
+  const chg = candle.close - candle.open;
+  const pct = candle.open ? (chg / candle.open) * 100 : 0;
+  const chgEl = document.getElementById("lgChg");
+  chgEl.className = chg >= 0 ? "up" : "down";
+  chgEl.textContent = (chg >= 0 ? "▲ " : "▼ ") + fmt(Math.abs(chg)) + " (" + fmt(Math.abs(pct)) + "%)";
+}
+
+// ---------- Chart init ----------
+function initCharts() {
+  const chartEl = document.getElementById("chart");
+  const volEl = document.getElementById("volChart");
+  const rsiEl = document.getElementById("rsiChart");
+  const macdEl = document.getElementById("macdChart");
+
+  const commonOptions = {
+    layout: { background: { color: "transparent" }, textColor: "#787B86", fontFamily: "'IBM Plex Mono', monospace" },
+    grid: { vertLines: { color: "#1E222D" }, horzLines: { color: "#1E222D" } },
+    rightPriceScale: { borderColor: "#2A2E39" },
+    timeScale: { borderColor: "#2A2E39" },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+  };
+
+  chart = LightweightCharts.createChart(chartEl, { ...commonOptions, height: 440 });
+  series = chart.addCandlestickSeries({
+    upColor: "#26A69A", downColor: "#EF5350",
+    borderUpColor: "#26A69A", borderDownColor: "#EF5350",
+    wickUpColor: "#26A69A", wickDownColor: "#EF5350",
+  });
+
+  volChart = LightweightCharts.createChart(volEl, { ...commonOptions, height: 80, timeScale: { borderColor: "#2A2E39", visible: true } });
+  volSeries = volChart.addHistogramSeries({ priceFormat: { type: "volume" }, priceScaleId: "" });
+
+  rsiChart = LightweightCharts.createChart(rsiEl, { ...commonOptions, height: 100, timeScale: { borderColor: "#2A2E39", visible: true } });
+  rsiSeries = rsiChart.addLineSeries({ color: "#E89A68", lineWidth: 1.5 });
+  rsiChart.priceScale("right").applyOptions({ scaleMargins: { top: 0.1, bottom: 0.1 } });
+  [30, 70].forEach((lvl) => rsiSeries.createPriceLine({ price: lvl, color: "#3A424B", lineStyle: 2, lineWidth: 1 }));
+
+  macdChart = LightweightCharts.createChart(macdEl, { ...commonOptions, height: 100, timeScale: { borderColor: "#2A2E39", visible: true } });
+  macdHistSeries = macdChart.addHistogramSeries({ priceFormat: { type: "volume" }, priceScaleId: "" });
+  macdLineSeries = macdChart.addLineSeries({ color: "#26A69A", lineWidth: 1.5 });
+  macdSignalSeries = macdChart.addLineSeries({ color: "#E89A68", lineWidth: 1.5 });
+
+  const panes = [chart, volChart, rsiChart, macdChart];
+  panes.forEach((p) => {
+    p.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+      if (!range) return;
+      panes.forEach((q) => { if (q !== p) q.timeScale().setVisibleLogicalRange(range); });
+      redrawOverlay();
+    });
+  });
+  chart.subscribeCrosshairMove((param) => {
+    redrawOverlay();
+    if (param && param.seriesData && param.seriesData.get(series)) updateLegend(param.seriesData.get(series));
+    else if (allCandles.length) updateLegend(allCandles[allCandles.length - 1]);
+  });
+
+  new ResizeObserver(() => {
+    chart.applyOptions({ width: chartEl.clientWidth });
+    volChart.applyOptions({ width: volEl.clientWidth });
+    rsiChart.applyOptions({ width: rsiEl.clientWidth });
+    macdChart.applyOptions({ width: macdEl.clientWidth });
+    resizeCanvas();
+  }).observe(chartEl);
+
+  resizeCanvas();
+}
+
+function applyRange() {
+  let candles = allCandles;
+  if (rangeDays > 0) {
+    const cutoff = Math.floor(Date.now() / 1000) - rangeDays * 86400;
+    candles = allCandles.filter((c) => c.time >= cutoff);
+  }
+  series.setData(candles.map((c) => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })));
+  volSeries.setData(candles.map((c) => ({
+    time: c.time, value: c.volume || 0,
+    color: c.close >= c.open ? "rgba(38,166,154,.5)" : "rgba(239,83,80,.5)",
+  })));
+  applyIndicators(candles);
+  chart.timeScale().fitContent();
+  volChart.timeScale().fitContent();
+  rsiChart.timeScale().fitContent();
+  macdChart.timeScale().fitContent();
+  setTimeout(redrawOverlay, 50);
+
+  if (candles.length) {
+    const last = candles[candles.length - 1];
+    const prev = candles.length > 1 ? candles[candles.length - 2] : null;
+
+    document.getElementById("ohO").textContent = fmt(last.open);
+    document.getElementById("ohH").textContent = fmt(last.high);
+    document.getElementById("ohL").textContent = fmt(last.low);
+    document.getElementById("ohC").textContent = fmt(last.close);
+    document.getElementById("ohV").textContent = (last.volume || 0).toLocaleString("en-US");
+    document.getElementById("dayLow").textContent = fmt(last.low);
+    document.getElementById("dayHigh").textContent = fmt(last.high);
+
+    const range = last.high - last.low;
+    const pos = range > 0 ? ((last.close - last.low) / range) * 100 : 50;
+    document.getElementById("rangeMarker").style.left = Math.min(98, Math.max(2, pos)) + "%";
+
+    const spread = Math.max(last.close * 0.001, 0.05);
+    const sellVal = fmt(last.close - spread), buyVal = fmt(last.close + spread);
+    document.getElementById("sellPriceTag").textContent = sellVal;
+    document.getElementById("buyPriceTag").textContent = buyVal;
+    document.getElementById("infoSell").textContent = sellVal;
+    document.getElementById("infoBuy").textContent = buyVal;
+
+    document.getElementById("infoPrice").textContent = fmt(last.close, 2);
+    updateLegend(last);
+
+    if (prev) {
+      const chg = last.close - prev.close;
+      const chgPct = (chg / prev.close) * 100;
+      const dir = chg >= 0 ? "up" : "down";
+      const chgStr = (chg >= 0 ? "+" : "") + fmt(chg, 2) + " (" + (chg >= 0 ? "+" : "") + fmt(chgPct, 2) + "%)";
+      document.getElementById("ohChg").className = dir;
+      document.getElementById("ohChg").textContent = chgStr;
+      const infoChgEl = document.getElementById("infoChg");
+      infoChgEl.className = "info-chg " + dir;
+      infoChgEl.textContent = chgStr;
+    }
+  }
+}
+
+function showChartStatus(html, isErr) {
+  const box = document.getElementById("chartStatus");
+  const text = document.getElementById("chartStatusText");
+  text.className = "status" + (isErr ? " err" : "");
+  text.innerHTML = html;
+  box.classList.add("show");
+}
+function hideChartStatus() { document.getElementById("chartStatus").classList.remove("show"); }
+
+async function fetchCandles(symbol) {
+  const res = await fetch(`${WORKER_URL}/?symbol=${encodeURIComponent(symbol)}`);
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+  if (!data.candles || !data.candles.length) throw new Error("No data returned for this symbol.");
+  return data.candles;
+}
+
+async function loadSymbol() {
+  const symbol = document.getElementById("symbolInput").value.trim().toUpperCase();
+  if (!symbol) return;
+  showChartStatus("Loading " + symbol + "…", false);
+  try {
+    const candles = await fetchCandles(symbol);
+    allCandles = candles;
+    currentSymbol = symbol;
+    document.getElementById("badgeSymbol").textContent = symbol;
+    document.getElementById("legTitle").textContent = symbol;
+    document.getElementById("infoSymName").textContent = symbol;
+    document.getElementById("infoGlyph").textContent = symbol.slice(0, 2);
+    if (!chart) initCharts();
+    applyRange();
+    loadDrawings(symbol);
+    setActiveTool("cursor");
+    resizeCanvas();
+    hideChartStatus();
+    setWatchlistActive(symbol);
+  } catch (err) {
+    showChartStatus("Couldn't load " + symbol + ": " + err.message, true);
+  }
+}
+
+document.getElementById("loadBtn").addEventListener("click", loadSymbol);
+document.getElementById("symbolInput").addEventListener("keydown", (e) => { if (e.key === "Enter") loadSymbol(); });
+document.getElementById("rangeRow").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-days]");
+  if (!btn) return;
+  document.querySelectorAll("#rangeRow .btn").forEach((b) => b.classList.remove("active"));
+  btn.classList.add("active");
+  rangeDays = Number(btn.dataset.days);
+  if (allCandles.length) applyRange();
+});
+
+// ---------- Watchlist ----------
+function setWatchlistActive(symbol) {
+  document.querySelectorAll(".wl-row").forEach((r) => r.classList.toggle("active", r.dataset.sym === symbol));
+}
+function removeFromWatchlist(sym) {
+  WATCHLIST_SYMBOLS = WATCHLIST_SYMBOLS.filter((s) => s !== sym);
+  saveWatchlist(WATCHLIST_SYMBOLS);
+  buildWatchlist();
+}
+function addToWatchlist(sym) {
+  sym = (sym || "").trim().toUpperCase();
+  if (!sym) return;
+  if (WATCHLIST_SYMBOLS.includes(sym)) return;
+  WATCHLIST_SYMBOLS = [...WATCHLIST_SYMBOLS, sym];
+  saveWatchlist(WATCHLIST_SYMBOLS);
+  buildWatchlist();
+}
+
+function buildWatchlist() {
+  const body = document.getElementById("watchlistBody");
+  body.innerHTML = "";
+  if (!WATCHLIST_SYMBOLS.length) {
+    body.innerHTML = '<div style="padding:14px; font-size:12px; color:#565A64;">No symbols yet — click + to add one.</div>';
+    return;
+  }
+  for (const sym of WATCHLIST_SYMBOLS) {
+    const row = document.createElement("div");
+    row.className = "wl-row";
+    row.dataset.sym = sym;
+    row.innerHTML = `
+      <div class="wl-sym"><span class="glyph">${sym.slice(0,2)}</span>${sym}</div>
+      <div class="wl-last mono">—</div>
+      <div class="wl-chg mono">—</div>
+      <div class="wl-chgpct mono">—</div>
+      <div class="wl-remove" title="Remove from watchlist">✕</div>`;
+    row.addEventListener("click", (e) => {
+      if (e.target.closest(".wl-remove")) return;
+      document.getElementById("symbolInput").value = sym;
+      loadSymbol();
+    });
+    row.querySelector(".wl-remove").addEventListener("click", (e) => {
+      e.stopPropagation();
+      removeFromWatchlist(sym);
+    });
+    body.appendChild(row);
+    fetchCandles(sym).then((candles) => {
+      if (!candles.length) return;
+      const last = candles[candles.length - 1];
+      const prev = candles.length > 1 ? candles[candles.length - 2] : null;
+      row.querySelector(".wl-last").textContent = fmt(last.close, 2);
+      if (prev) {
+        const chg = last.close - prev.close;
+        const pct = (chg / prev.close) * 100;
+        const dir = chg >= 0 ? "up" : "down";
+        row.querySelector(".wl-chg").className = "wl-chg mono " + dir;
+        row.querySelector(".wl-chg").textContent = (chg >= 0 ? "+" : "") + fmt(chg, 2);
+        row.querySelector(".wl-chgpct").className = "wl-chgpct mono " + dir;
+        row.querySelector(".wl-chgpct").textContent = (chg >= 0 ? "+" : "") + fmt(pct, 2) + "%";
+      }
+    }).catch(() => { row.querySelector(".wl-last").textContent = "n/a"; });
+  }
+  setWatchlistActive(currentSymbol);
+}
+
+document.getElementById("wlAddBtn").addEventListener("click", () => {
+  const sym = prompt("Add symbol to watchlist (e.g. NABIL):");
+  if (sym) addToWatchlist(sym);
+});
+document.getElementById("wlResetBtn").addEventListener("click", () => {
+  if (confirm("Reset watchlist to the default symbols?")) {
+    WATCHLIST_SYMBOLS = [...DEFAULT_WATCHLIST];
+    saveWatchlist(WATCHLIST_SYMBOLS);
+    buildWatchlist();
+  }
+});
+
+buildWatchlist();
+loadSymbol();
+</script>
+</body>
+</html>

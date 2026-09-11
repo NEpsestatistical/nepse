@@ -1,0 +1,51 @@
+/* NTC components.css — watchlist + symbol search + modals */
+.ntc-wl-tabs { display: flex; align-items: center; gap: 4px; padding: 8px 10px; border-bottom: 1px solid var(--ntc-border); overflow-x: auto; }
+.ntc-wl-tab { padding: 5px 10px; font-size: 11.5px; border-radius: 4px; background: transparent; border: 1px solid transparent; color: var(--ntc-text-dim); white-space: nowrap; }
+.ntc-wl-tab.active { background: var(--ntc-accent-dim); color: #5B9CF6; border-color: var(--ntc-accent); }
+.ntc-wl-tab-add { width: 26px; height: 26px; flex-shrink: 0; border-radius: 4px; color: var(--ntc-text-dim); background: transparent; border: 1px dashed var(--ntc-border); }
+
+.ntc-wl-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; gap: 6px; }
+.ntc-wl-head input { flex: 1; background: var(--ntc-panel); border: 1px solid var(--ntc-border); border-radius: 4px; padding: 6px 8px; color: var(--ntc-text); font-size: 12px; }
+.ntc-icon-btn { width: 26px; height: 26px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 4px; color: var(--ntc-text-dim); background: transparent; border: none; }
+.ntc-icon-btn:hover { background: var(--ntc-panel); color: var(--ntc-text); }
+
+.ntc-wl-table-head { display: grid; grid-template-columns: 1.5fr 1fr 0.9fr; padding: 4px 12px; font-size: 10.5px; color: #565A64; }
+.ntc-wl-table-head span:not(:first-child) { text-align: right; }
+
+.ntc-wl-list { flex: 1; overflow-y: auto; }
+.ntc-wl-row {
+  position: relative; display: grid; grid-template-columns: 1.5fr 1fr 0.9fr; align-items: center;
+  padding: 8px 12px; font-size: 12.5px; cursor: grab; border-bottom: 1px solid #1A1E27;
+}
+.ntc-wl-row:hover { background: #1A1E27; }
+.ntc-wl-row.active { background: var(--ntc-accent-dim); }
+.ntc-wl-row.dragging { opacity: .4; }
+.ntc-wl-sym { font-weight: 600; color: var(--ntc-text); }
+.ntc-wl-last, .ntc-wl-chg { text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+.ntc-wl-remove {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  width: 18px; height: 18px; border-radius: 3px; display: none; align-items: center; justify-content: center;
+  color: var(--ntc-text-dim); background: #2A2E39; border: none;
+}
+.ntc-wl-row:hover .ntc-wl-remove { display: flex; }
+.ntc-wl-empty { padding: 20px 14px; font-size: 12px; color: var(--ntc-text-dim); text-align: center; }
+
+/* symbol search modal */
+.ntc-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: flex-start; justify-content: center; z-index: 50; padding-top: 10vh; }
+.ntc-modal-overlay.show { display: flex; }
+.ntc-modal { width: 420px; max-width: 92vw; max-height: 70vh; background: var(--ntc-panel); border: 1px solid var(--ntc-border); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; }
+.ntc-modal-head { padding: 12px; border-bottom: 1px solid var(--ntc-border); }
+.ntc-modal-head input { width: 100%; background: var(--ntc-bg); border: 1px solid var(--ntc-border); border-radius: 5px; padding: 9px 10px; color: var(--ntc-text); font-size: 14px; }
+.ntc-modal-list { overflow-y: auto; flex: 1; }
+.ntc-modal-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 14px; font-size: 13px; cursor: pointer; }
+.ntc-modal-row:hover { background: #1A1E27; }
+.ntc-modal-row .sym { font-weight: 600; }
+.ntc-modal-row .name { font-size: 11px; color: var(--ntc-text-dim); margin-left: 8px; }
+.ntc-modal-empty { padding: 24px; text-align: center; color: var(--ntc-text-dim); font-size: 12.5px; }
+
+/* small inline prompt (rename list) */
+.ntc-inline-prompt { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: center; justify-content: center; z-index: 60; }
+.ntc-inline-prompt.show { display: flex; }
+.ntc-inline-prompt-box { background: var(--ntc-panel); border: 1px solid var(--ntc-border); border-radius: 8px; padding: 16px; width: 280px; }
+.ntc-inline-prompt-box input { width: 100%; background: var(--ntc-bg); border: 1px solid var(--ntc-border); border-radius: 5px; padding: 8px; color: var(--ntc-text); margin: 10px 0; }
+.ntc-inline-prompt-box .row { display: flex; gap: 8px; justify-content: flex-end; }
