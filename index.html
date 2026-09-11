@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NEPSE Portfolio & Advanced Trading Chart</title>
+    <meta name="description" content="Professional NEPSE stock portfolio manager with an advanced TradingView-style interactive charting system featuring technical indicators, drawing tools, and Fibonacci retracements." />
+    <meta property="og:title" content="NEPSE Portfolio & Advanced Trading Chart" />
+    <meta property="og:description" content="Professional NEPSE stock portfolio manager with an advanced TradingView-style interactive charting system featuring technical indicators, drawing tools, and Fibonacci retracements." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <script>
+      try {
+        if (window && window.fetch) {
+          const originalFetch = window.fetch;
+          Object.defineProperty(window, 'fetch', {
+            get: () => originalFetch,
+            set: () => {},
+            configurable: true
+          });
+        }
+      } catch (e) {}
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
