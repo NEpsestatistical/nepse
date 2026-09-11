@@ -1,0 +1,10 @@
+.ntc-chart-grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(var(--ntc-layout-cols,1),minmax(0,1fr));grid-template-rows:repeat(var(--ntc-layout-rows,1),minmax(0,1fr));gap:2px;background:var(--ntc-border);overflow:auto}
+.ntc-chart-card{position:relative;min-width:0;min-height:180px;background:var(--ntc-bg);display:flex;flex-direction:column;overflow:hidden;outline:1px solid transparent}
+.ntc-chart-card.active{outline:1px solid var(--ntc-accent);z-index:2}
+.ntc-chart-card-head{height:24px;flex:0 0 24px;display:flex;align-items:center;gap:7px;padding:0 7px;background:var(--ntc-panel);border-bottom:1px solid var(--ntc-border);font-size:10px;color:var(--ntc-text-dim)}
+.ntc-chart-card-head b{color:var(--ntc-text);font-size:11px}.ntc-chart-card-head .spacer{flex:1}.ntc-chart-card-head button{border:0;background:transparent;color:var(--ntc-text-dim);font-size:10px;cursor:pointer}.ntc-chart-card-head button:hover{color:var(--ntc-text)}
+.ntc-chart-card .ntc-card-chart{flex:1;min-height:0;position:relative}.ntc-chart-card .ntc-card-chart{display:flex;flex-direction:column}.ntc-chart-card .ntc-card-main{position:relative;flex:1;min-height:90px}.ntc-chart-card .ntc-card-vol{position:relative;left:auto;right:auto;bottom:auto;height:68px;flex:0 0 68px;border-top:1px solid var(--ntc-border)}
+.ntc-chart-card .ntc-indicator-pane{flex:0 0 auto;position:relative!important;height:130px!important}.ntc-chart-card .ntc-indicator-pane-chart{height:106px!important}
+.ntc-layout-select{min-width:92px}.ntc-sync-menu{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--ntc-text-dim)}.ntc-sync-menu label{display:flex;gap:3px;align-items:center;white-space:nowrap}.ntc-chart-badge{font-size:9px;color:var(--ntc-text-dim)}
+@media(max-width:1100px){.ntc-chart-grid{grid-template-columns:repeat(min(var(--ntc-layout-cols,1),2),minmax(0,1fr))}}
+@media(max-width:700px){.ntc-chart-grid{display:flex;flex-direction:column}.ntc-chart-card{min-height:360px}.ntc-chart-card:not(.active){display:none}}
