@@ -4,6 +4,9 @@
   const KEY=()=>global.NTC_CONFIG.STORAGE_PREFIX+"drawings_v1";
   const COLORS=["#2962FF","#FF9800","#AB47BC","#26A69A","#EF5350","#42A5F5"];
   const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+  const FIB_LEVELS=[0,.236,.382,.5,.618,.786,1];
+  const FIBEXT_LEVELS=[0,.236,.382,.5,.618,.786,1,1.272,1.414,1.618,2,2.618];
+  const POINTS_NEEDED={channel:3};
 
   class DrawingEngine{
     constructor({container,chart,series,symbol,onChange}){
@@ -70,7 +73,8 @@
         const q=this._lastDomPoint;if(performance.now()-q.at<40&&Math.abs(q.x-x)<2&&Math.abs(q.y-y)<2)return;
       }
       this.points.push(p);
-      if(["horizontal","vertical","text"].includes(this.tool)||this.points.length>=2)this._finish();
+      const need=POINTS_NEEDED[this.tool]||2;
+      if(["horizontal","vertical","text"].includes(this.tool)||this.points.length>=need)this._finish();
       this.render();
     }
 
@@ -93,8 +97,10 @@
       if(this.tool==="text")d.text=prompt("Text:","")||"";
       if(this.tool==="horizontal")d.b={time:b.time,price:a.price};
       if(this.tool==="vertical")d.b={time:a.time,price:b.price};
-      if(this.tool==="fib")d.levels=[0,.236,.382,.5,.618,.786,1];
+      if(this.tool==="fib")d.levels=FIB_LEVELS.slice();
+      if(this.tool==="fibext")d.levels=FIBEXT_LEVELS.slice();
       if(this.tool==="measure"){d.deltaPrice=b.price-a.price;d.deltaPct=a.price?d.deltaPrice/a.price*100:0;}
+      if(this.tool==="channel"){d.b=this.points[1];d.c=this.points[2]||this.points[1];}
       this.drawings.push(d);this.points=[];this.tool="cursor";this.container.classList.remove("ntc-drawing-active");
       this.save();this.onChange(this.drawings);this.render();
     }
@@ -128,12 +134,20 @@
           const inside=x>=rx&&x<=rx+rw&&y>=ry&&y<=ry+rh;
           if(inside)dist=0;
           else dist=Math.min(Math.hypot(x-rx,y-ry),Math.hypot(x-(rx+rw),y-ry),Math.hypot(x-rx,y-(ry+rh)),Math.hypot(x-(rx+rw),y-(ry+rh)));
-        } else if(d.type==="fib"){
+        } else if(d.type==="fib"||d.type==="fibext"){
           const diff=d.b.price-d.a.price;
-          for(const l of (d.levels||[0,.236,.382,.5,.618,.786,1])){
+          for(const l of (d.levels||FIB_LEVELS)){
             const yy=this.series.priceToCoordinate(d.a.price+diff*l);
             if(yy!=null)dist=Math.min(dist,Math.abs(y-yy));
           }
+        } else if(d.type==="ellipse"){
+          const cx=(a.x+b.x)/2,cy=(a.y+b.y)/2,rx=Math.abs(b.x-a.x)/2||1,ry=Math.abs(b.y-a.y)/2||1;
+          const nx=(x-cx)/rx,ny=(y-cy)/ry,r=Math.hypot(nx,ny);
+          dist=Math.abs(r-1)*Math.min(rx,ry);
+        } else if(d.type==="channel"){
+          const c=this._xy(d.c||d.b);
+          const off=c&&c.y!=null?c.y-a.y-(b.y-a.y)*((c.x-a.x)/((b.x-a.x)||1)):0;
+          dist=Math.min(distSeg(x,y,a.x,a.y,b.x,b.y),distSeg(x,y,a.x,a.y+off,b.x,b.y+off));
         } else if(d.type==="text"){
           const w=Math.max(28,(d.text||"Text").length*7+8);dist=(x>=a.x-8&&x<=a.x+w&&y>=a.y-20&&y<=a.y+4)?0:Math.hypot(x-a.x,y-a.y);
         } else dist=distSeg(x,y,a.x,a.y,b.x,b.y);
@@ -166,15 +180,34 @@
           const x=Math.min(a.x,b.x),y=Math.min(a.y,b.y),w=Math.abs(b.x-a.x),h=Math.abs(b.y-a.y);
           this._el("rect",{...common,x,y,width:w,height:h});
           this._hit(this._el("rect",{stroke:"transparent","stroke-width":8,fill:"transparent",x,y,width:w,height:h},),d.id,"fill");
-        } else if(d.type==="fib"){
+        } else if(d.type==="fib"||d.type==="fibext"){
           const diff=d.b.price-d.a.price;
-          (d.levels||[0,.236,.382,.5,.618,.786,1]).forEach((l,i)=>{
+          const levels=d.levels||(d.type==="fibext"?FIBEXT_LEVELS:FIB_LEVELS);
+          levels.forEach((l,i)=>{
             const price=d.a.price+diff*l,y=this.series.priceToCoordinate(price);if(y==null)return;
-            const attrs={...common,opacity:i===0||i===6?.9:.55,x1:0,y1:y,x2:this.container.clientWidth,y2:y};
+            const attrs={...common,opacity:l===0||l===1?.9:.55,x1:0,y1:y,x2:this.container.clientWidth,y2:y};
             this._el("line",attrs);
             this._hit(this._el("line",{stroke:"transparent","stroke-width":10,fill:"none",x1:0,y1:y,x2:this.container.clientWidth,y2:y}),d.id);
             const t=this._el("text",{x:Math.min(a.x+6,this.container.clientWidth-70),y:y-3,fill:d.color,"font-size":10,stroke:"none"});t.textContent=(l*100).toFixed(1)+"%";
           });
+        } else if(d.type==="ellipse"){
+          const cx=(a.x+b.x)/2,cy=(a.y+b.y)/2,rx=Math.abs(b.x-a.x)/2,ry=Math.abs(b.y-a.y)/2;
+          this._el("ellipse",{...common,cx,cy,rx,ry});
+          this._hit(this._el("ellipse",{stroke:"transparent","stroke-width":8,fill:"transparent",cx,cy,rx,ry}),d.id);
+        } else if(d.type==="arrow"){
+          this._el("line",{...common,x1:a.x,y1:a.y,x2:b.x,y2:b.y});
+          const ang=Math.atan2(b.y-a.y,b.x-a.x),len=10,spread=.5;
+          const p1x=b.x-len*Math.cos(ang-spread),p1y=b.y-len*Math.sin(ang-spread);
+          const p2x=b.x-len*Math.cos(ang+spread),p2y=b.y-len*Math.sin(ang+spread);
+          this._el("polygon",{points:`${b.x},${b.y} ${p1x},${p1y} ${p2x},${p2y}`,fill:d.color,stroke:"none"});
+          this._hit(this._el("line",{stroke:"transparent","stroke-width":12,fill:"none",x1:a.x,y1:a.y,x2:b.x,y2:b.y}),d.id);
+        } else if(d.type==="channel"){
+          const c=this._xy(d.c||d.b);
+          const off=(c&&c.y!=null)?c.y-a.y-(b.y-a.y)*((c.x-a.x)/((b.x-a.x)||1)):0;
+          this._el("line",{...common,x1:a.x,y1:a.y,x2:b.x,y2:b.y});
+          this._el("line",{...common,opacity:.7,x1:a.x,y1:a.y+off,x2:b.x,y2:b.y+off});
+          this._hit(this._el("line",{stroke:"transparent","stroke-width":12,fill:"none",x1:a.x,y1:a.y,x2:b.x,y2:b.y}),d.id);
+          this._hit(this._el("line",{stroke:"transparent","stroke-width":12,fill:"none",x1:a.x,y1:a.y+off,x2:b.x,y2:b.y+off}),d.id);
         } else if(d.type==="text"){
           const t=this._el("text",{x:a.x,y:a.y,fill:d.color,"font-size":12,stroke:"none"});t.textContent=d.text||"Text";
           this._hit(this._el("rect",{x:a.x-8,y:a.y-16,width:Math.max(28,(d.text||"Text").length*7+8),height:20,fill:"transparent",stroke:"transparent"}),d.id,"fill");
