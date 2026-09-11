@@ -252,8 +252,8 @@ export const AdvancedChart: React.FC<AdvancedChartProps> = ({
                 lineStyle: idx === 1 ? 0 : 2,
               });
               const lineData = data
-                .map((d, i) => ({ time: d.time, value: vals[i] }))
-                .filter((d): d is { time: number; value: number } => typeof d.value === 'number' && !isNaN(d.value) && d.value !== null);
+                .map((d, i) => ({ time: d.time, value: vals ? vals[i] : null }))
+                .filter((d): d is { time: number; value: number } => typeof d.value === 'number' && !isNaN(d.value) && d.value !== null && d.value !== undefined);
               series.setData(lineData as any);
               indicatorSeriesMap.current.set(`${ind.id}_${band}`, series);
             });
@@ -269,8 +269,8 @@ export const AdvancedChart: React.FC<AdvancedChartProps> = ({
                 lineWidth: 1,
               });
               const lineData = data
-                .map((d, i) => ({ time: d.time, value: vals[i] }))
-                .filter((d): d is { time: number; value: number } => typeof d.value === 'number' && !isNaN(d.value) && d.value !== null);
+                .map((d, i) => ({ time: d.time, value: vals ? vals[i] : null }))
+                .filter((d): d is { time: number; value: number } => typeof d.value === 'number' && !isNaN(d.value) && d.value !== null && d.value !== undefined);
               series.setData(lineData as any);
               indicatorSeriesMap.current.set(`${ind.id}_${line}`, series);
             });
@@ -286,8 +286,8 @@ export const AdvancedChart: React.FC<AdvancedChartProps> = ({
                 lineWidth: 1,
               });
               const lineData = data
-                .map((d, i) => ({ time: d.time, value: vals[i] }))
-                .filter((d): d is { time: number; value: number } => typeof d.value === 'number' && !isNaN(d.value) && d.value !== null);
+                .map((d, i) => ({ time: d.time, value: vals ? vals[i] : null }))
+                .filter((d): d is { time: number; value: number } => typeof d.value === 'number' && !isNaN(d.value) && d.value !== null && d.value !== undefined);
               series.setData(lineData as any);
               indicatorSeriesMap.current.set(`${ind.id}_${line}`, series);
             });
@@ -298,8 +298,8 @@ export const AdvancedChart: React.FC<AdvancedChartProps> = ({
         if (values && values.length > 0) {
           const series = chartRef.current!.addSeries(LineSeries, { color, lineWidth: 2 });
           const lineData = data
-            .map((d, i) => ({ time: d.time, value: values[i] }))
-            .filter((d): d is { time: number; value: number } => typeof d.value === 'number' && !isNaN(d.value) && d.value !== null);
+            .map((d, i) => ({ time: d.time, value: values ? values[i] : null }))
+            .filter((d): d is { time: number; value: number } => typeof d.value === 'number' && !isNaN(d.value) && d.value !== null && d.value !== undefined);
           series.setData(lineData as any);
           indicatorSeriesMap.current.set(ind.id, series);
         }
