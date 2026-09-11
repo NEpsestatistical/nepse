@@ -61,7 +61,8 @@
 
     <section class="monitor-grid" id="discovery">
       <article class="panel" id="gainersPanel">
-        <div class="panel-head"><div><p class="section-kicker">Discovery</p><h2>Top Gainers</h2></div><span class="panel-index">03</span></div>
+        <div class="panel-head"><div><p class="section-kicker">Discovery</p><h2>Top Gainers</h2></div><div class="panel-head-actions"><button type="button" id="discoveryRefreshBtn" class="refresh-btn" aria-label="Refresh Top Gainers and Contribution data"><span class="refresh-icon" aria-hidden="true">🔄</span><span class="refresh-label">Refresh</span></button><span class="panel-index">03</span></div></div>
+        <p id="discoveryRefreshStatus" class="stage-note refresh-status" role="status" aria-live="polite"></p>
         <div class="table-scroll"><table id="gainersTable"><thead><tr><th>Symbol</th><th>LTP</th><th>Change</th></tr></thead><tbody><tr><td colspan="3" class="loading">Loading…</td></tr></tbody></table></div>
       </article>
       <article class="panel" id="losersPanel">
@@ -73,6 +74,7 @@
     <section class="monitor-grid" id="moversPanel" style="margin-bottom:28px;">
       <article class="panel" id="moversGainPanel">
         <div class="panel-head"><div><p class="section-kicker">Discovery</p><h2>Top Contribution — Green</h2></div><span class="panel-index">05</span></div>
+        <p class="stage-note">Refreshed together with Top Gainers via the 🔄 button above.</p>
         <div class="table-scroll"><table id="moversGainTable"><thead><tr><th>#</th><th>Symbol</th><th>Change</th><th>Index contribution</th></tr></thead><tbody><tr><td colspan="4" class="loading">Loading…</td></tr></tbody></table></div>
         <button type="button" class="stage-note" id="moversGainMore" style="background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;">Show all</button>
       </article>
