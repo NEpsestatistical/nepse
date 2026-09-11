@@ -64,6 +64,7 @@
     workspaceBtn: $("#ntcWorkspaceBtn"), brokerBtn: $("#ntcBrokerBtn"), workspaceModal: $("#ntcWorkspaceModal"), workspaceClose: $("#ntcWorkspaceClose"),
     brokerLabel: $("#ntcBrokerLabel"), brokerBaseUrl: $("#ntcBrokerBaseUrl"), brokerHealthPath: $("#ntcBrokerHealthPath"), brokerAuthMode: $("#ntcBrokerAuthMode"), brokerSecret: $("#ntcBrokerSecret"),
     brokerSave: $("#ntcBrokerSave"), brokerTest: $("#ntcBrokerTest"), brokerDisconnect: $("#ntcBrokerDisconnect"), exportWorkspace: $("#ntcExportWorkspace"), importWorkspace: $("#ntcImportWorkspace"), workspaceFile: $("#ntcWorkspaceFile"), errorToast: $("#ntcErrorToast"),
+    themeMenu: $("#ntcThemeMenu"), themeBtn: $("#ntcThemeBtn"), themeLabel: $("#ntcThemeLabel"), themeList: $("#ntcThemeList"),
   };
 
   const STATE = window.NTC_STATE;
@@ -504,6 +505,29 @@
   }
   function processPaperForItem(item){if(!window.NTC_PAPER||!item||!item.candles.length)return;const c=item.candles[item.candles.length-1];window.NTC_PAPER.processQuote(item.symbol,{close:c.close});if(els.paperModal.classList.contains("show"))renderPaper()}
 
+  function initTheme(){
+    if(!window.NTC_THEME||!els.themeBtn)return;
+    const THEME=window.NTC_THEME;
+    function renderList(){
+      els.themeList.innerHTML="";
+      THEME.THEMES.forEach(t=>{
+        const btn=document.createElement("button");
+        btn.classList.toggle("active",t.id===THEME.current());
+        btn.innerHTML=`<span class="ntc-theme-swatch" style="background:${{dark:"#131722",light:"#FFFFFF",midnight:"#0B0E14",solarized:"#FDF6E3"}[t.id]}"></span>${t.label}`;
+        btn.addEventListener("click",()=>{THEME.apply(t.id);els.themeList.classList.remove("show");els.themeLabel.textContent=t.label;renderList();});
+        els.themeList.appendChild(btn);
+      });
+    }
+    renderList();
+    const active=THEME.THEMES.find(t=>t.id===THEME.current());
+    if(active)els.themeLabel.textContent=active.label;
+    els.themeBtn.addEventListener("click",(e)=>{e.stopPropagation();els.themeList.classList.toggle("show");});
+    document.addEventListener("click",(e)=>{if(!els.themeMenu.contains(e.target))els.themeList.classList.remove("show");});
+    window.addEventListener("ntc-theme-changed",()=>{
+      charts.forEach(c=>{if(c.engine)c.engine.applyTheme();if(c.drawings)c.drawings.render();});
+    });
+  }
+
   // ---------- Wire everything ----------
   function initDrawings(){
     els.drawToolbar.querySelectorAll("[data-draw]").forEach(btn=>btn.addEventListener("click",()=>{els.drawToolbar.querySelectorAll("[data-draw]").forEach(x=>x.classList.remove("tool-active"));btn.classList.add("tool-active");if(drawings)drawings.setTool(btn.dataset.draw)}));
@@ -593,6 +617,8 @@
   }
 
   async function boot() {
+    if(window.NTC_THEME)window.NTC_THEME.init();
+    initTheme();
     window.NTC_WATCHLIST.init();
     window.NTC_PANELS.init(els);
     initIndicators();
