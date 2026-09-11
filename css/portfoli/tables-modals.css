@@ -1,0 +1,244 @@
+/* IMPORT DROP ZONE */
+.drop-zone {
+  position: relative;
+  overflow: hidden;
+  min-height: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(
+      circle at center,
+      rgba(63,167,150,.035),
+      transparent 65%
+    );
+  border: 1px dashed rgba(255,255,255,.16);
+  transition:
+    border-color .2s ease,
+    background .2s ease,
+    transform .2s ease,
+    box-shadow .2s ease;
+}
+
+.drop-zone::before {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border: 1px solid rgba(255,255,255,.025);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.drop-zone:hover,
+.drop-zone.dragover {
+  border-color: rgba(63,167,150,.7);
+  background:
+    radial-gradient(
+      circle at center,
+      rgba(63,167,150,.10),
+      transparent 65%
+    );
+  transform: translateY(-2px);
+  box-shadow:
+    0 10px 30px rgba(0,0,0,.20),
+    0 0 25px rgba(63,167,150,.06);
+}
+
+/* PREMIUM TRANSACTION TABLE */
+.tx-table {
+  border-spacing: 0;
+}
+
+.tx-table thead {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255,255,255,.035),
+      rgba(255,255,255,.012)
+    );
+}
+
+.tx-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #171c20;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.04);
+}
+
+.tx-table tbody tr {
+  transition:
+    background .16s ease,
+    transform .16s ease;
+}
+
+.tx-table tbody tr:hover {
+  background: rgba(255,255,255,.025);
+}
+
+.tx-table td {
+  transition: color .16s ease;
+}
+
+.tx-side {
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.025);
+}
+
+/* PREMIUM PANELS */
+.panel,
+.settings-box {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255,255,255,.045),
+      rgba(255,255,255,.012)
+    );
+  border-color: rgba(255,255,255,.075);
+  box-shadow:
+    0 20px 50px rgba(0,0,0,.23),
+    inset 0 1px 0 rgba(255,255,255,.035);
+}
+
+.panel::before,
+.settings-box::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      rgba(255,255,255,.13),
+      transparent
+    );
+  pointer-events: none;
+}
+
+/* INPUT DEPTH */
+.add-row input,
+.tx-add-row input,
+.tx-add-row select,
+.settings-box input[type="text"],
+.rate-field input,
+.modal-field input {
+  transition:
+    border-color .18s ease,
+    box-shadow .18s ease,
+    background .18s ease;
+}
+
+.add-row input:focus,
+.tx-add-row input:focus,
+.tx-add-row select:focus,
+.settings-box input[type="text"]:focus,
+.rate-field input:focus,
+.modal-field input:focus {
+  outline: none;
+  border-color: rgba(63,167,150,.65);
+  background: rgba(20,24,28,.95);
+  box-shadow:
+    0 0 0 3px rgba(63,167,150,.07),
+    inset 0 1px 3px rgba(0,0,0,.3);
+}
+
+/* PREMIUM TRADE MODAL */
+.modal-overlay {
+  background:
+    radial-gradient(
+      circle at center,
+      rgba(20,25,30,.35),
+      rgba(3,5,7,.82)
+    );
+  backdrop-filter: blur(8px);
+}
+
+.modal-box {
+  position: relative;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(31,37,42,.98),
+      rgba(20,24,28,.98)
+    );
+  border-color: rgba(255,255,255,.10);
+  box-shadow:
+    0 35px 90px rgba(0,0,0,.55),
+    0 10px 30px rgba(0,0,0,.30),
+    inset 0 1px 0 rgba(255,255,255,.05);
+  transform:
+    perspective(1000px)
+    translateZ(20px);
+}
+
+@media (max-width: 760px) {
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .stats .stat {
+    min-height: 95px;
+    padding: 14px;
+  }
+  .stats .stat:hover {
+    transform: translateY(-2px);
+  }
+  .table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .day-pl-strip {
+    padding: 13px 14px;
+  }
+  .panel,
+  .settings-box {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats {
+    grid-template-columns: 1fr;
+  }
+  .stats .stat {
+    min-height: 88px;
+  }
+  .add-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  #symbolInput,
+  #qtyInput,
+  #costInput,
+  #dateInput,
+  .add-btn {
+    width: 100%;
+  }
+  #symbolInput {
+    grid-column: 1 / -1;
+  }
+  .add-btn {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .stats .stat:hover,
+  .table > #holdingsList > .row:hover {
+    transform: none !important;
+  }
+}
+
