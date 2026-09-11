@@ -571,6 +571,7 @@ async function loadMarketDiscovery(force) {
     ]);
     if (!board.length) throw new Error("Empty board");
     renderAll(board, index);
+    return { ok: true };
   } catch (e) {
     console.error("[market] discovery load failed:", e.message);
     const pb = document.getElementById("pulseBreadth");
@@ -591,8 +592,59 @@ async function loadMarketDiscovery(force) {
     if (sb) sb.innerHTML = `<tr><td colspan="6" class="loading">Market data unavailable — ${escapeHtml(e.message)}</td></tr>`;
     if (tt) tt.textContent = "—";
     if (tb) tb.innerHTML = `<tr><td colspan="3" class="loading">Market data unavailable — ${escapeHtml(e.message)}</td></tr>`;
+    return { ok: false, error: e.message };
   }
 }
+
+/* ---------- Manual refresh button — re-fetches/recalculates Top Gainers + Losers,
+   Contribution (movers), Sector impact, Market Pulse and Turnover in place, using
+   the exact same fetch/render pipeline as the initial load (force=true bypasses the
+   cache). Never reloads the page and never touches portfolio state/storage. ---------- */
+let _discoveryRefreshInFlight = false;
+
+function setDiscoveryRefreshUI(state, message) {
+  const btn = document.getElementById("discoveryRefreshBtn");
+  const status = document.getElementById("discoveryRefreshStatus");
+  if (btn) {
+    btn.disabled = state === "loading";
+    btn.classList.toggle("is-loading", state === "loading");
+  }
+  if (status) {
+    status.textContent = message || "";
+    status.classList.toggle("is-error", state === "error");
+    status.classList.toggle("is-ok", state === "ok");
+  }
+}
+
+async function handleDiscoveryRefreshClick() {
+  if (_discoveryRefreshInFlight) return; // ignore repeat clicks while a refresh is running
+  _discoveryRefreshInFlight = true;
+  setDiscoveryRefreshUI("loading", "Refreshing…");
+  try {
+    const result = await loadMarketDiscovery(true); // force = bypass cache, re-fetch + recalculate
+    if (result && result.ok) {
+      setDiscoveryRefreshUI("ok", "Updated just now.");
+    } else {
+      const reason = result && result.error ? result.error : "Unknown error";
+      setDiscoveryRefreshUI("error", `Refresh failed — ${reason}. Showing last available data.`);
+    }
+  } catch (e) {
+    // Defensive: loadMarketDiscovery already catches its own errors, but never let a
+    // refresh click throw past the UI and leave the button stuck in a loading state.
+    setDiscoveryRefreshUI("error", `Refresh failed — ${e.message}. Showing last available data.`);
+  } finally {
+    _discoveryRefreshInFlight = false;
+    if (document.getElementById("discoveryRefreshBtn")) {
+      document.getElementById("discoveryRefreshBtn").disabled = false;
+      document.getElementById("discoveryRefreshBtn").classList.remove("is-loading");
+    }
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const refreshBtn = document.getElementById("discoveryRefreshBtn");
+  if (refreshBtn) refreshBtn.addEventListener("click", handleDiscoveryRefreshClick);
+});
 
 document.addEventListener("DOMContentLoaded", () => {
   loadCacheFromSession();
