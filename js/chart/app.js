@@ -27,7 +27,11 @@
     statusBox: $("#ntcStatus"),
     statusText: $("#ntcStatusText"),
     timeframeRow: $("#ntcTfRow"),
-    chartTypeSelect: $("#ntcChartTypeSelect"),
+    chartTypeMenu: $("#ntcChartTypeMenu"),
+    chartTypeBtn: $("#ntcChartTypeBtn"),
+    chartTypeIcon: $("#ntcChartTypeIcon"),
+    chartTypeLabel: $("#ntcChartTypeLabel"),
+    chartTypeList: $("#ntcChartTypeList"),
     searchInput: $("#ntcTopSearchInput"),
     searchTrigger: $("#ntcRailSearch"),
     watchlistTrigger: $("#ntcRailWatchlist"),
@@ -505,6 +509,12 @@
   }
   function processPaperForItem(item){if(!window.NTC_PAPER||!item||!item.candles.length)return;const c=item.candles[item.candles.length-1];window.NTC_PAPER.processQuote(item.symbol,{close:c.close});if(els.paperModal.classList.contains("show"))renderPaper()}
 
+  function initChartTypeMenu(){
+    if(!els.chartTypeBtn)return;
+    els.chartTypeBtn.addEventListener("click",(e)=>{e.stopPropagation();els.chartTypeList.classList.toggle("show");});
+    document.addEventListener("click",(e)=>{if(!els.chartTypeMenu.contains(e.target))els.chartTypeList.classList.remove("show");});
+  }
+
   function initTheme(){
     if(!window.NTC_THEME||!els.themeBtn)return;
     const THEME=window.NTC_THEME;
@@ -545,9 +555,23 @@
       } else if(e.key==="Escape"){drawings.selected=null;drawings.render();}
     });
     els.fitBtn.addEventListener("click",()=>engine&&engine.autoscale());
-    els.logBtn.addEventListener("click",()=>engine&&engine.setScaleMode("log"));
-    els.pctBtn.addEventListener("click",()=>engine&&engine.setScaleMode("percent"));
-    els.invertBtn.addEventListener("click",()=>engine&&engine.setScaleMode("invert"));
+    els.logBtn.addEventListener("click",()=>{
+      if(!engine)return;
+      const {priceMode}=engine.setScaleMode("log");
+      els.logBtn.classList.toggle("active", priceMode==="log");
+      els.pctBtn.classList.toggle("active", priceMode==="percent");
+    });
+    els.pctBtn.addEventListener("click",()=>{
+      if(!engine)return;
+      const {priceMode}=engine.setScaleMode("percent");
+      els.pctBtn.classList.toggle("active", priceMode==="percent");
+      els.logBtn.classList.toggle("active", priceMode==="log");
+    });
+    els.invertBtn.addEventListener("click",()=>{
+      if(!engine)return;
+      const {invert}=engine.setScaleMode("invert");
+      els.invertBtn.classList.toggle("active", invert);
+    });
   }
 
   function wireEvents() {
@@ -619,6 +643,7 @@
   async function boot() {
     if(window.NTC_THEME)window.NTC_THEME.init();
     initTheme();
+    initChartTypeMenu();
     window.NTC_WATCHLIST.init();
     window.NTC_PANELS.init(els);
     initIndicators();
@@ -630,7 +655,7 @@
     initLayout();
     window.NTC_TOOLBAR.init({
       timeframeEl: els.timeframeRow,
-      chartTypeEl: els.chartTypeSelect,
+      chartTypeEl: els.chartTypeList,
       onTimeframe: (id) => {
         if(replay) replay.close();
         const item=activeItem(); if(!item)return; item.timeframe=id; STATE.timeframe=id;
