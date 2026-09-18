@@ -106,7 +106,7 @@ async function openProfile(otherId){
       <div class="feed" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px;">
         ${theirPosts.map(p=>`
           <div class="post-card" onclick="closeModals(); openDetail('${p.id}')">
-            <div class="post-thumb"><img src="${p.imageDataUrl}" alt="${escapeHtml(p.ticker)} chart" loading="lazy"></div>
+            <div class="post-thumb">${mediaThumbHtml(p)}</div>
             <div style="padding:8px 10px; display:flex; flex-direction:column; gap:5px;">
               <span class="badge ${p.sentiment}" style="font-size:11px;">${sentArrow(p.sentiment)} $${escapeHtml(p.ticker)}</span>
               ${p.entryPrice != null ? perfBadgeHtml(p, null, true) : ""}

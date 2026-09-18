@@ -32,6 +32,8 @@ async function loadPostsFromSupabase(){
       timeframe: p.timeframe,
       caption: p.caption || "",
       imageDataUrl: p.image_data_url,
+      mediaType: p.media_type || "image",
+      videoUrl: p.video_url || null,
       authorId: p.author_id,
       author: author ? author.name : "Trader",
       createdAt: p.created_at,
