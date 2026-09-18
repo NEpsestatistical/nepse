@@ -19,7 +19,18 @@ class NTCEngine{
  clearIndicators(){this.indicatorSeries.forEach(x=>{try{x.chart.removeSeries(x.series)}catch(e){}});this.indicatorSeries=[];Object.keys(this.panes).forEach(id=>this.panes[id].el.remove());this.panes={}}
  renderIndicators(active,candles){this.activeIndicatorsCache=active;this.clearIndicators();if(!candles||!candles.length)return;const defs=global.NTC_INDICATORS;active.forEach((item,idx)=>{const def=defs.registry[item.id];if(!def)return;let res;try{res=defs.calculate(item.id,candles,item.settings||{})}catch(e){console.warn("[ntc-indicator]",item.id,e);return}if(!res)return;let target=this.chart,paneId="main";if(!res.overlay){paneId="ind_"+idx;const pane=this._pane(paneId,def.name);target=pane.chart}const seriesColor=["#2962FF","#FF9800","#AB47BC","#26A69A","#EF5350","#42A5F5","#FFCA28","#EC407A"];(res.lines||[]).forEach((line,j)=>{const s=target.addLineSeries({color:seriesColor[(idx+j)%seriesColor.length],lineWidth:1,priceLineVisible:false,lastValueVisible:false});s.setData(defs.mapSeries(candles,line[1]));this.indicatorSeries.push({chart:target,series:s,id:item.id});if(paneId!=="main")s.applyOptions({lastValueVisible:true})});if(res.hist){const s=target.addHistogramSeries({priceFormat:{type:"price",precision:2,minMove:.01},base:0,priceScaleId:""});s.setData(defs.mapSeries(candles,res.hist[1]).map(x=>({...x,color:x.value>=0?"rgba(38,166,154,.55)":"rgba(239,83,80,.55)"})));target.priceScale("").applyOptions({scaleMargins:{top:.1,bottom:.1}});this.indicatorSeries.push({chart:target,series:s,id:item.id})}if(res.points){res.points.forEach((pt,j)=>{const s=target.addLineSeries({color:seriesColor[(idx+j)%seriesColor.length],lineWidth:1,priceLineVisible:false,lastValueVisible:false});s.setData(defs.mapSeries(candles,pt[1]));this.indicatorSeries.push({chart:target,series:s,id:item.id})})}if(res.bounds&&paneId!=="main"){res.bounds.forEach(v=>{const s=target.addLineSeries({color:"#5B5F6B",lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,priceLineVisible:false,lastValueVisible:false});s.setData(candles.map(x=>({time:x.time,value:v})));this.indicatorSeries.push({chart:target,series:s,id:item.id})})}if(res.labels&&paneId==="main"){const markers=res.labels.map((x,i)=>x?{time:candles[i].time,position:"aboveBar",color:seriesColor[idx%seriesColor.length],shape:"circle",text:x}:null).filter(Boolean);try{this.mainSeries.setMarkers(markers)}catch(e){}}});Object.values(this.panes).forEach(p=>p.chart.timeScale().fitContent());this.chart.timeScale().fitContent()}
  autoscale(){this.chart.timeScale().fitContent();this.volChart.timeScale().fitContent();Object.values(this.panes).forEach(p=>p.chart.timeScale().fitContent())}
- setScaleMode(mode){const ps=this.chart.priceScale("right");if(mode==="invert")ps.applyOptions({invertScale:true});else ps.applyOptions({invertScale:false,mode:mode==="log"?1:mode==="percent"?2:0})}
+ setScaleMode(mode){
+   const ps=this.chart.priceScale("right");
+   if(mode==="invert"){
+     this._invertMode=!this._invertMode;
+   } else {
+     // Log and Percent are mutually exclusive, like TradingView — clicking the
+     // active one again turns it off; clicking the other switches to it.
+     this._priceMode = this._priceMode===mode ? "normal" : mode;
+   }
+   ps.applyOptions({invertScale: !!this._invertMode, mode: this._priceMode==="log"?1:this._priceMode==="percent"?2:0});
+   return {priceMode:this._priceMode||"normal", invert:!!this._invertMode};
+ }
  lastPoint(){return this._lastCandles.length?this._lastCandles[this._lastCandles.length-1]:null}
  destroy(){try{global.removeEventListener("ntc-theme-changed",this._onTheme)}catch(e){}try{this._ro&&this._ro.disconnect()}catch(e){}}
 }
