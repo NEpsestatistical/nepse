@@ -20,3 +20,5 @@
 .ntc-dp-lock,.ntc-dp-delete{background:none;border:1px solid var(--ntc-border);border-radius:4px;color:var(--ntc-text);padding:4px 8px;cursor:pointer;font-size:11.5px}
 .ntc-dp-lock:hover,.ntc-dp-delete:hover{background:var(--ntc-accent-dim)}
 .ntc-dp-delete:hover{color:#EF5350;border-color:#EF5350}
+.ntc-dp-dash{background:none;border:1px solid var(--ntc-border);border-radius:4px;color:var(--ntc-text);padding:3px 8px;cursor:pointer;font-size:11px}
+.ntc-dp-dash.active{border-color:var(--ntc-accent,#2962FF);color:var(--ntc-accent,#2962FF)}
