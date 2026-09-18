@@ -12,6 +12,14 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const supabaseReady = SUPABASE_URL.startsWith("http") && SUPABASE_ANON_KEY && SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY";
 const sb = supabaseReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
+/* ================= VIDEO UPLOAD (Cloudflare R2 Worker) =================
+   Deploy cloudflare-video-worker/ (included alongside this file) as a Cloudflare
+   Worker bound to an R2 bucket, then paste its *.workers.dev URL below.
+   Why R2 instead of Supabase Storage: R2 charges for storage only, not egress —
+   so a post can be watched any number of times without burning a bandwidth cap.
+================================================== */
+const VIDEO_UPLOAD_WORKER_URL = "https://your-video-upload-worker.your-subdomain.workers.dev"; // TODO: replace after deploying
+
 /* ================= CONFIG ================= */
 const TIMEFRAMES = ["Scalp","Day","Swing","Position"];
 const storageAvailable = typeof window !== "undefined" && !!window.indexedDB;
