@@ -55,6 +55,11 @@
         // pointer-events, so an invisible SVG layer can never disable chart panning.
         const r=this.container.getBoundingClientRect();
         const x=e.clientX-r.left,y=e.clientY-r.top;
+        // If a drawing is already selected, check its resize handles (endpoints)
+        // first, so grabbing a handle resizes that point instead of moving the
+        // whole shape.
+        const handleHit=this._handleHitTest(x,y);
+        if(handleHit){e.preventDefault();e.stopPropagation();this._startDragFromPoint(e,handleHit.id,x,y,handleHit.handle);return;}
         const hit=this._hitTest(x,y);
         if(hit){e.preventDefault();e.stopPropagation();this._startDragFromPoint(e,hit.id,x,y);}
         else if(this.selected){this.deselect();}
@@ -111,6 +116,23 @@
       el.dataset.drawingId=id;el.dataset.hit=kind;el.classList.add("ntc-drawing-hit");
       el.style.pointerEvents="none";
       return el;
+    }
+
+    _handleHitTest(x,y){
+      if(!this.selected)return null;
+      const d=this._find(this.selected);if(!d)return null;
+      const tol=9;
+      const a=this._xy(d.a);
+      if(a&&a.x!=null&&a.y!=null&&Math.hypot(x-a.x,y-a.y)<=tol)return {id:d.id,handle:"a"};
+      if(d.type!=="horizontal"&&d.type!=="vertical"&&d.type!=="text"){
+        const b=this._xy(d.b);
+        if(b&&b.x!=null&&b.y!=null&&Math.hypot(x-b.x,y-b.y)<=tol)return {id:d.id,handle:"b"};
+      }
+      if(d.type==="channel"){
+        const c=this._xy(d.c||d.b);
+        if(c&&c.x!=null&&c.y!=null&&Math.hypot(x-c.x,y-c.y)<=tol)return {id:d.id,handle:"c"};
+      }
+      return null;
     }
 
     _hitTest(x,y){
@@ -240,13 +262,13 @@
       this._startDragFromPoint(e,id,e.clientX-r.left,e.clientY-r.top);
     }
 
-    _startDragFromPoint(e,id,x,y){
+    _startDragFromPoint(e,id,x,y,handle){
       if(this.tool!=="cursor"||this.hidden)return;
       const d=this._find(id);if(!d)return;
       e.preventDefault();e.stopPropagation();this.selected=id;this.render();this.onSelect(d,this);
       if(d.locked)return; // selectable (so it can be unlocked/edited) but not draggable
       const p=this._anchor(x,y);if(!p)return;
-      this.drag={id,start:p,origA:{...d.a},origB:{...d.b},moved:false};this.container.classList.add("ntc-drawing-dragging");
+      this.drag={id,handle:handle||null,start:p,origA:{...d.a},origB:{...d.b},origC:d.c?{...d.c}:null,moved:false};this.container.classList.add("ntc-drawing-dragging");
     }
 
     _dragMove(e){
@@ -256,13 +278,28 @@
       const r=this.container.getBoundingClientRect(),p=this._anchor(e.clientX-r.left,e.clientY-r.top);if(!p)return;
       const dt=p.time-this.drag.start.time,dp=p.price-this.drag.start.price;
       if(Math.abs(dt)+Math.abs(dp)>0){e.preventDefault();e.stopPropagation();this.drag.moved=true;}
-      if(d.type==="horizontal"){
+      const handle=this.drag.handle;
+      if(handle){
+        // Resize: move only the grabbed endpoint, keep the other(s) fixed.
+        if(handle==="a"){
+          if(d.type==="horizontal")d.a={time:d.a.time,price:p.price};
+          else if(d.type==="vertical")d.a={time:p.time,price:d.a.price};
+          else d.a={time:p.time,price:p.price};
+        } else if(handle==="b"){
+          if(d.type==="horizontal")d.b={time:d.b.time,price:p.price},d.a={...d.a,price:p.price};
+          else if(d.type==="vertical")d.b={time:p.time,price:d.b.price},d.a={...d.a,time:p.time};
+          else d.b={time:p.time,price:p.price};
+        } else if(handle==="c"){
+          d.c={time:p.time,price:p.price};
+        }
+      } else if(d.type==="horizontal"){
         d.a.price=this.drag.origA.price+dp;d.b.price=this.drag.origB.price+dp;
       } else if(d.type==="vertical"){
         d.a.time=this.drag.origA.time+dt;d.b.time=this.drag.origB.time+dt;
       } else {
         d.a={time:this.drag.origA.time+dt,price:this.drag.origA.price+dp};
         d.b={time:this.drag.origB.time+dt,price:this.drag.origB.price+dp};
+        if(this.drag.origC)d.c={time:this.drag.origC.time+dt,price:this.drag.origC.price+dp};
       }
       this.render();
     }
