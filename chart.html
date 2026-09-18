@@ -16,7 +16,7 @@
     }
   })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.2.1/dist/lightweight-charts.standalone.production.js"></script>
 <link rel="stylesheet" href="css/chart/base.css" />
 <link rel="stylesheet" href="css/chart/layout.css" />
 <link rel="stylesheet" href="css/chart/components.css" />
@@ -140,12 +140,26 @@
         <label><input type="checkbox" data-sync="crosshair">Cross</label>
       </div>
       <div class="ntc-chart-controls">
-        <button class="ntc-btn" id="ntcFitBtn" title="Fit all data">Fit</button>
-        <button class="ntc-btn" id="ntcLogBtn" title="Logarithmic scale">Log</button>
-        <button class="ntc-btn" id="ntcPctBtn" title="Percentage scale">%</button>
-        <button class="ntc-btn" id="ntcInvertBtn" title="Invert scale">Invert</button>
+        <button class="ntc-btn ntc-icon-only" id="ntcFitBtn" title="Fit all data">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+        </button>
+        <button class="ntc-btn ntc-icon-only" id="ntcLogBtn" title="Logarithmic scale">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 17c1-6 3-10 5-10s2 4 3 8 2 5 4 5"/></svg>
+        </button>
+        <button class="ntc-btn ntc-icon-only" id="ntcPctBtn" title="Percentage scale">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+        </button>
+        <button class="ntc-btn ntc-icon-only" id="ntcInvertBtn" title="Invert scale">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10l5-5 5 5"/><path d="M7 14l5 5 5-5"/></svg>
+        </button>
       </div>
-      <select class="ntc-select" id="ntcChartTypeSelect" title="Chart type"></select>
+      <div class="ntc-chart-type-menu" id="ntcChartTypeMenu">
+        <button class="ntc-btn" id="ntcChartTypeBtn" title="Chart type">
+          <svg id="ntcChartTypeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="9" width="3" height="8"/><line x1="6.5" y1="9" x2="6.5" y2="4"/><line x1="6.5" y1="17" x2="6.5" y2="21"/><rect x="11" y="5" width="3" height="14"/><line x1="12.5" y1="5" x2="12.5" y2="2"/><line x1="12.5" y1="19" x2="12.5" y2="22"/><rect x="17" y="11" width="3" height="6"/><line x1="18.5" y1="11" x2="18.5" y2="7"/><line x1="18.5" y1="17" x2="18.5" y2="20"/></svg>
+          <span id="ntcChartTypeLabel">Candles</span>
+        </button>
+        <div class="ntc-chart-type-list" id="ntcChartTypeList"></div>
+      </div>
     </div>
 
     <div class="ntc-toolbar">
