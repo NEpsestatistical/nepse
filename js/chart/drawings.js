@@ -98,7 +98,7 @@
 
     _finish(){
       const a=this.points[0],b=this.points[1]||a;
-      let d={id:"d"+Date.now()+Math.random().toString(16).slice(2),type:this.tool,a,b,color:COLORS[this.drawings.length%COLORS.length],width:1};
+      let d={id:"d"+Date.now()+Math.random().toString(16).slice(2),type:this.tool,a,b,color:COLORS[this.drawings.length%COLORS.length],width:2};
       if(this.tool==="text")d.text=prompt("Text:","")||"";
       if(this.tool==="horizontal")d.b={time:b.time,price:a.price};
       if(this.tool==="vertical")d.b={time:a.time,price:b.price};
@@ -121,7 +121,7 @@
     _handleHitTest(x,y){
       if(!this.selected)return null;
       const d=this._find(this.selected);if(!d)return null;
-      const tol=9;
+      const tol=13;
       const a=this._xy(d.a);
       if(a&&a.x!=null&&a.y!=null&&Math.hypot(x-a.x,y-a.y)<=tol)return {id:d.id,handle:"a"};
       if(d.type!=="horizontal"&&d.type!=="vertical"&&d.type!=="text"){
@@ -136,7 +136,7 @@
     }
 
     _hitTest(x,y){
-      const tol=8;
+      const tol=12;
       let best=null,bestDist=Infinity;
       const distSeg=(px,py,ax,ay,bx,by)=>{
         const dx=bx-ax,dy=by-ay;
@@ -178,7 +178,7 @@
       return best;
     }
 
-    _drawCommon(d){return {stroke:d.color,fill:"none","stroke-width":d.width||1,"vector-effect":"non-scaling-stroke"}}
+    _drawCommon(d){const c={stroke:d.color,fill:"none","stroke-width":d.width||1,"vector-effect":"non-scaling-stroke"};if(d.dash==="dashed")c["stroke-dasharray"]="6 4";else if(d.dash==="dotted")c["stroke-dasharray"]="1.5 4";return c}
 
     render(){
       this.svg.innerHTML="";
@@ -240,8 +240,9 @@
         }
         if(selected){
           const color=this.locked?"#777":d.color;
-          this._el("circle",{cx:a.x,cy:a.y,r:5,fill:"none",stroke:color,"stroke-width":1.5});
-          if(d.type!=="horizontal"&&d.type!=="vertical"&&d.type!=="text")this._el("circle",{cx:b.x,cy:b.y,r:5,fill:"none",stroke:color,"stroke-width":1.5});
+          this._el("circle",{cx:a.x,cy:a.y,r:7,fill:"var(--ntc-panel,#131722)",stroke:color,"stroke-width":2});
+          if(d.type!=="horizontal"&&d.type!=="vertical"&&d.type!=="text")this._el("circle",{cx:b.x,cy:b.y,r:7,fill:"var(--ntc-panel,#131722)",stroke:color,"stroke-width":2});
+          if(d.type==="channel"){const c=this._xy(d.c||d.b);if(c&&c.x!=null)this._el("circle",{cx:c.x,cy:c.y,r:7,fill:"var(--ntc-panel,#131722)",stroke:color,"stroke-width":2});}
         }
       }
       this.svg.style.pointerEvents=this.tool==="cursor"&&!this.locked?"none":"none";

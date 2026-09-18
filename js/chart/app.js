@@ -711,7 +711,7 @@
     // background-load the board for search + watchlist quotes
     window.NTC_SYMBOLSEARCH.ensureLoaded();
     renderWatchlistPanel();
-    setInterval(async()=>{for(const item of charts){if(item.symbol&&item.candles.length){try{item.candles=await window.NTC_DATAFEED.fetchCandles(item.symbol);item.engine.render(item.candles);item.engine.renderIndicators(item.indicators||[],item.candles);processPaperForItem(item);await checkAlerts(item)}catch(e){}}}},30000);
+    setInterval(async()=>{for(const item of charts){if(item.symbol&&item.candles.length){try{item.candles=await window.NTC_DATAFEED.fetchCandles(item.symbol);item.engine.render(item.candles,{fit:false});if(item.drawings)item.drawings.render();item.engine.renderIndicators(item.indicators||[],item.candles);processPaperForItem(item);await checkAlerts(item)}catch(e){}}}},30000);
   }
 
   document.addEventListener("DOMContentLoaded", boot);

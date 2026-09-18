@@ -35,9 +35,11 @@
       const d=this._drawing;if(!d)return;
       const swatches=COLORS.map(c=>`<button class="ntc-dp-swatch${c.toLowerCase()===String(d.color||"").toLowerCase()?" active":""}" data-color="${c}" style="background:${c}" title="${c}"></button>`).join("");
       const widths=WIDTHS.map(w=>`<button class="ntc-dp-width${(d.width||1)===w?" active":""}" data-width="${w}" title="Width ${w}"><span style="height:${w}px"></span></button>`).join("");
+      const dashes=[["solid","Solid"],["dashed","Dashed"],["dotted","Dotted"]].map(([id,label])=>`<button class="ntc-dp-dash${(d.dash||"solid")===id?" active":""}" data-dash="${id}">${label}</button>`).join("");
       this.el.innerHTML=`
         <div class="ntc-dp-row ntc-dp-colors">${swatches}</div>
         <div class="ntc-dp-row ntc-dp-widths">${widths}</div>
+        <div class="ntc-dp-row ntc-dp-dashes">${dashes}</div>
         <div class="ntc-dp-row ntc-dp-actions">
           <button class="ntc-dp-lock" title="${d.locked?"Unlock":"Lock"}">${d.locked?"🔒 Locked":"🔓 Lock"}</button>
           <button class="ntc-dp-delete" title="Delete" ${d.locked?"disabled":""}>🗑 Delete</button>
@@ -47,6 +49,9 @@
       });
       this.el.querySelectorAll(".ntc-dp-width").forEach(btn=>{
         btn.addEventListener("click",()=>{this._engine&&this._engine.updateSelected({width:Number(btn.dataset.width)});});
+      });
+      this.el.querySelectorAll(".ntc-dp-dash").forEach(btn=>{
+        btn.addEventListener("click",()=>{this._engine&&this._engine.updateSelected({dash:btn.dataset.dash});});
       });
       this.el.querySelector(".ntc-dp-lock").addEventListener("click",()=>{
         if(!this._engine)return;this._engine.updateSelected({locked:!d.locked});
