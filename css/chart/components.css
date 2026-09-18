@@ -49,3 +49,29 @@
 .ntc-inline-prompt-box { background: var(--ntc-panel); border: 1px solid var(--ntc-border); border-radius: 8px; padding: 16px; width: 280px; }
 .ntc-inline-prompt-box input { width: 100%; background: var(--ntc-bg); border: 1px solid var(--ntc-border); border-radius: 5px; padding: 8px; color: var(--ntc-text); margin: 10px 0; }
 .ntc-inline-prompt-box .row { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* top-bar icon buttons (Fit / Log / % / Invert) — TradingView-style compact toggles */
+.ntc-chart-controls { display: flex; align-items: center; gap: 2px; }
+.ntc-btn.ntc-icon-only { padding: 6px; width: 30px; height: 30px; justify-content: center; }
+.ntc-btn.ntc-icon-only svg { width: 15px; height: 15px; }
+.ntc-btn.ntc-icon-only.active { background: var(--ntc-accent-dim); border-color: var(--ntc-accent); color: #5B9CF6; }
+
+/* chart-type icon dropdown (replaces the old plain <select>) */
+.ntc-chart-type-menu { position: relative; }
+.ntc-chart-type-menu .ntc-btn svg { width: 15px; height: 15px; }
+.ntc-chart-type-list {
+  display: none; position: absolute; top: calc(100% + 4px); right: 0; min-width: 190px;
+  background: var(--ntc-panel); border: 1px solid var(--ntc-border); border-radius: 6px;
+  box-shadow: 0 8px 20px var(--ntc-shadow, rgba(0,0,0,.4)); z-index: 50; overflow: hidden;
+  max-height: 340px; overflow-y: auto;
+}
+.ntc-chart-type-list.show { display: block; }
+.ntc-chart-type-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  background: none; border: none; color: var(--ntc-text); padding: 8px 12px; font-size: 12.5px;
+}
+.ntc-chart-type-row svg { width: 16px; height: 16px; flex-shrink: 0; }
+.ntc-chart-type-row:hover:not(.ntc-disabled) { background: var(--ntc-accent-dim); }
+.ntc-chart-type-row.active { color: #5B9CF6; }
+.ntc-chart-type-row.ntc-disabled { opacity: .4; cursor: not-allowed; }
+.ntc-chart-type-row .ntc-soon { margin-left: auto; font-size: 10px; color: var(--ntc-text-dim); }
