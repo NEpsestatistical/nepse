@@ -125,7 +125,7 @@
         window.NTC_PANELS.updateFromCandle(last,prev);
       }
     }});
-    if(window.NTC_DrawingEngine)item.drawings=new window.NTC_DrawingEngine({container:main,chart:item.engine.chart,series:item.engine.mainSeries,symbol:item.symbol,onChange:()=>{}});
+    if(window.NTC_DrawingEngine)item.drawings=new window.NTC_DrawingEngine({container:main,chart:item.engine.chart,series:item.engine.mainSeries,symbol:item.symbol,onChange:()=>{},onSelect:(d,eng)=>{if(!window.NTC_DrawingPanel)return;if(d)window.NTC_DrawingPanel.show(d,eng);else window.NTC_DrawingPanel.hide();}});
     head.querySelector("button").addEventListener("click",()=>layoutManager.setActive(index));
     card.addEventListener("dblclick",()=>layoutManager.setActive(index));
     return item;
@@ -374,6 +374,22 @@
   }
 
 
+  // ---------- Indicator color/width picker ----------
+  function pickColor(defaultColor) {
+    return new Promise((resolve) => {
+      const inp = document.createElement("input");
+      inp.type = "color";
+      inp.value = /^#[0-9a-f]{6}$/i.test(defaultColor || "") ? defaultColor : "#2962FF";
+      inp.style.position = "fixed"; inp.style.left = "-9999px";
+      document.body.appendChild(inp);
+      let resolved = false;
+      const done = (val) => { if (resolved) return; resolved = true; inp.remove(); resolve(val); };
+      inp.addEventListener("change", () => done(inp.value));
+      inp.addEventListener("blur", () => setTimeout(() => done(null), 250));
+      inp.click();
+    });
+  }
+
   // ---------- Phase 2 Indicator Manager ----------
   function indicatorDefaults(def) {
     const s = {};
@@ -410,6 +426,11 @@
     if(["bb","keltner","atrbands"].includes(item.id)){const v=await promptText(`${d.name}: multiplier`,String(current.mult||2));if(v===null)return;const n=Number(v);if(!Number.isFinite(n)||n<=0)return alert("Multiplier must be positive.");next.mult=n}
     if(item.id==="supertrend"){const v=await promptText("Supertrend: ATR multiplier",String(current.mult||3));if(v===null)return;next.mult=Number(v)||3}
     if(item.id==="macd"){const f=await promptText("MACD: fast period",String(current.fast||12));if(f===null)return;const sl=await promptText("MACD: slow period",String(current.slow||26));if(sl===null)return;const sg=await promptText("MACD: signal period",String(current.signal||9));if(sg===null)return;next.fast=Number(f)||12;next.slow=Number(sl)||26;next.signal=Number(sg)||9}
+    if(confirm(`${d.name}: change color/line width?`)){
+      const c=await pickColor(current.color);if(c)next.color=c;
+      const w=await promptText(`${d.name}: line width`,String(current.lineWidth||1));
+      if(w!==null){const n=Number(w);if(Number.isFinite(n)&&n>0)next.lineWidth=Math.round(n);}
+    }
     activeIndicators[idx].settings=next; rerenderIndicators();
   }
   function removeIndicator(idx){activeIndicators.splice(idx,1);rerenderIndicators()}
@@ -552,7 +573,7 @@
         const tag=(document.activeElement&&document.activeElement.tagName||"").toLowerCase();
         if(["input","textarea","select"].includes(tag))return;
         e.preventDefault();drawings.deleteSelected();
-      } else if(e.key==="Escape"){drawings.selected=null;drawings.render();}
+      } else if(e.key==="Escape"){drawings.deselect();}
     });
     els.fitBtn.addEventListener("click",()=>engine&&engine.autoscale());
     els.logBtn.addEventListener("click",()=>{

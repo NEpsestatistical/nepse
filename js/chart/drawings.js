@@ -9,8 +9,8 @@
   const POINTS_NEEDED={channel:3};
 
   class DrawingEngine{
-    constructor({container,chart,series,symbol,onChange}){
-      this.container=container;this.chart=chart;this.series=series;this.symbol=symbol;this.onChange=onChange||(()=>{});
+    constructor({container,chart,series,symbol,onChange,onSelect}){
+      this.container=container;this.chart=chart;this.series=series;this.symbol=symbol;this.onChange=onChange||(()=>{});this.onSelect=onSelect||(()=>{});
       this.tool="cursor";this.points=[];this.drawings=[];this.selected=null;this.hidden=false;this.locked=false;this.drag=null;
       this._makeSvg();this._bind();this.load(symbol);
     }
@@ -57,7 +57,7 @@
         const x=e.clientX-r.left,y=e.clientY-r.top;
         const hit=this._hitTest(x,y);
         if(hit){e.preventDefault();e.stopPropagation();this._startDragFromPoint(e,hit.id,x,y);}
-        else if(this.selected){this.selected=null;this.render();}
+        else if(this.selected){this.deselect();}
       };
       this.container.addEventListener("pointerdown",this.documentPointerDown,true);
       document.addEventListener("pointermove",this._pointerMove,{passive:false});
@@ -86,7 +86,7 @@
 
     setTool(tool){
       this.tool=tool;this.points=[];
-      if(tool!=="cursor")this.selected=null;
+      if(tool!=="cursor"){this.selected=null;this.onSelect(null,this);}
       this.container.classList.toggle("ntc-drawing-active",tool!=="cursor");
       this.render();
     }
@@ -124,7 +124,7 @@
       };
       for(let i=this.drawings.length-1;i>=0;i--){
         const d=this.drawings[i];
-        if(!d||d.locked)continue;
+        if(!d)continue;
         const a=this._xy(d.a),b=this._xy(d.b);if(!a||!b||a.x==null||a.y==null||b.x==null||b.y==null)continue;
         let dist=Infinity;
         if(d.type==="horizontal")dist=Math.abs(y-a.y);
@@ -225,7 +225,15 @@
       this.svg.style.pointerEvents=this.tool==="cursor"&&!this.locked?"none":"none";
     }
 
-    select(id){if(!this._find(id))return false;this.selected=id;this.render();return true}
+    select(id){const d=this._find(id);if(!d)return false;this.selected=id;this.render();this.onSelect(d,this);return true}
+    deselect(){this.selected=null;this.render();this.onSelect(null,this)}
+    xyOf(p){return this._xy(p)}
+    updateSelected(props){
+      const d=this._find(this.selected);if(!d)return false;
+      Object.assign(d,props);
+      this.save();this.onChange(this.drawings);this.render();this.onSelect(d,this);
+      return true;
+    }
 
     _startDrag(e,id){
       const r=this.container.getBoundingClientRect();
@@ -234,8 +242,9 @@
 
     _startDragFromPoint(e,id,x,y){
       if(this.tool!=="cursor"||this.hidden)return;
-      const d=this._find(id);if(!d||d.locked)return;
-      e.preventDefault();e.stopPropagation();this.selected=id;this.render();
+      const d=this._find(id);if(!d)return;
+      e.preventDefault();e.stopPropagation();this.selected=id;this.render();this.onSelect(d,this);
+      if(d.locked)return; // selectable (so it can be unlocked/edited) but not draggable
       const p=this._anchor(x,y);if(!p)return;
       this.drag={id,start:p,origA:{...d.a},origB:{...d.b},moved:false};this.container.classList.add("ntc-drawing-dragging");
     }
@@ -261,13 +270,14 @@
     _dragEnd(){
       if(!this.drag)return;
       const moved=this.drag.moved;this.drag=null;this.container.classList.remove("ntc-drawing-dragging");
-      if(moved){const d=this._find(this.selected);if(d&&d.type==="measure"){d.deltaPrice=d.b.price-d.a.price;d.deltaPct=d.a.price?d.deltaPrice/d.a.price*100:0;}this.save();this.onChange(this.drawings);this.render();}
+      if(moved){const d=this._find(this.selected);if(d&&d.type==="measure"){d.deltaPrice=d.b.price-d.a.price;d.deltaPct=d.a.price?d.deltaPrice/d.a.price*100:0;}this.save();this.onChange(this.drawings);this.render();const sel=this._find(this.selected);if(sel)this.onSelect(sel,this);}
     }
 
     deleteSelected(){
       if(!this.selected||this.locked)return false;
+      const sel=this._find(this.selected);if(sel&&sel.locked)return false;
       const idx=this.drawings.findIndex(d=>d.id===this.selected);if(idx<0){this.selected=null;return false;}
-      this.drawings.splice(idx,1);this.selected=null;this.save();this.onChange(this.drawings);this.render();return true;
+      this.drawings.splice(idx,1);this.selected=null;this.save();this.onChange(this.drawings);this.render();this.onSelect(null,this);return true;
     }
 
     load(symbol){try{const all=JSON.parse(localStorage.getItem(KEY())||"{}");this.drawings=Array.isArray(all[symbol])?all[symbol]:[];}catch(e){this.drawings=[]}this.selected=null;this.render()}
