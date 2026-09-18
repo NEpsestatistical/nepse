@@ -66,7 +66,25 @@ async function computeWinRate(posts){
   return { wins, losses, pushes, unresolved, total: tracked.length, winRate: decided ? Math.round((wins/decided)*100) : null };
 }
 
-/* ================= IMAGE HANDLING ================= */
+/* ================= MEDIA RENDERING (image or video) ================= */
+// Chart posts can carry either a compressed image (stored inline as a data URL)
+// or an uploaded video (stored in Supabase Storage, referenced by URL).
+function mediaThumbHtml(p){
+  if(p.mediaType === "video" && p.videoUrl){
+    return `<video src="${p.videoUrl}" muted loop playsinline preload="metadata"
+      onmouseover="this.play().catch(()=>{})" onmouseout="this.pause()"></video>`;
+  }
+  return `<img src="${p.imageDataUrl}" alt="${escapeHtml(p.ticker)} chart" loading="lazy">`;
+}
+function mediaDetailHtml(p){
+  if(p.mediaType === "video" && p.videoUrl){
+    return `<video class="detail-img" src="${p.videoUrl}" controls playsinline></video>`;
+  }
+  return `<img class="detail-img" src="${p.imageDataUrl}" alt="${escapeHtml(p.ticker)} chart" onclick="openLightbox('${(p.imageDataUrl||"").replace(/'/g,"\\'")}')">`;
+}
+
+/* ================= IMAGE / VIDEO HANDLING ================= */
+const MAX_VIDEO_MB = 50;
 function compressImage(file, maxDim=1000, quality=0.72){
   return new Promise((resolve,reject)=>{
     const reader = new FileReader();
@@ -93,16 +111,66 @@ function compressImage(file, maxDim=1000, quality=0.72){
 }
 async function handleFile(file){
   if(!file) return;
-  if(!file.type || !file.type.startsWith("image/")){ showToast("Please choose an image file"); return; }
-  try{
-    const dataUrl = await compressImage(file);
-    state.newPost.image = dataUrl;
-    const dz = document.getElementById("drop-zone");
-    dz.classList.add("has-img");
-    dz.innerHTML = `<img src="${dataUrl}" alt="preview">`;
-  }catch(e){
-    showToast("Couldn't read that image: " + (e && e.message ? e.message : "unknown error"));
+  const isImage = file.type && file.type.startsWith("image/");
+  const isVideo = file.type && file.type.startsWith("video/");
+  if(!isImage && !isVideo){ showToast("Please choose an image or video file"); return; }
+  const dz = document.getElementById("drop-zone");
+
+  if(isImage){
+    try{
+      const dataUrl = await compressImage(file);
+      state.newPost.image = dataUrl;
+      state.newPost.video = null;
+      state.newPost.mediaType = "image";
+      dz.classList.add("has-img");
+      dz.innerHTML = `<img src="${dataUrl}" alt="preview">`;
+    }catch(e){
+      showToast("Couldn't read that image: " + (e && e.message ? e.message : "unknown error"));
+    }
+    return;
   }
+
+  // Video: upload straight to R2 via the Cloudflare Worker rather than inlining
+  // as base64 — clips are far too large to store as a data URL in a database
+  // column, and R2 (unlike Supabase Storage) doesn't charge for bandwidth, so
+  // views don't eat into any quota.
+  if(file.size > MAX_VIDEO_MB * 1024 * 1024){
+    showToast(`Video too large — keep it under ${MAX_VIDEO_MB}MB`);
+    return;
+  }
+  if(!state.currentUser){ showToast("Sign in to post a video"); return; }
+  dz.classList.add("has-img");
+  dz.innerHTML = `<div class="dz-label"><span class="em">⏳</span>Uploading video…</div>`;
+  try{
+    const url = await uploadVideoToStorage(file);
+    state.newPost.image = null;
+    state.newPost.video = url;
+    state.newPost.mediaType = "video";
+    dz.innerHTML = `<video src="${url}" controls muted style="max-width:100%; max-height:100%;"></video>`;
+  }catch(e){
+    dz.classList.remove("has-img");
+    dz.innerHTML = `<div class="dz-label"><span class="em">📊</span>Tap to upload a chart screenshot<br><span style="text-decoration:underline;">or drag &amp; drop an image or video here</span></div>`;
+    showToast("Couldn't upload video: " + (e && e.message ? e.message : "unknown error"));
+  }
+}
+async function uploadVideoToStorage(file){
+  if(!VIDEO_UPLOAD_WORKER_URL || VIDEO_UPLOAD_WORKER_URL.includes("your-video-upload-worker")){
+    throw new Error("Video upload isn't set up yet — deploy the Worker and set VIDEO_UPLOAD_WORKER_URL in core.js");
+  }
+  const ext = (file.name.split(".").pop() || "mp4").toLowerCase();
+  const key = `${state.currentUser.id}/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+  const res = await fetch(`${VIDEO_UPLOAD_WORKER_URL}/${key}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": file.type || "application/octet-stream",
+      "Authorization": `Bearer ${sb && sb.auth ? (await sb.auth.getSession()).data.session?.access_token || "" : ""}`,
+    },
+    body: file,
+  });
+  if(!res.ok) throw new Error(`Upload failed (${res.status})`);
+  const data = await res.json();
+  if(!data.url) throw new Error("Worker didn't return a URL");
+  return data.url;
 }
 function setupDropZone(){
   const dz = document.getElementById("drop-zone");
@@ -118,9 +186,9 @@ function setupDropZone(){
 
 /* ================= NEW POST ================= */
 function openNewPost(){
-  state.newPost = { image:null, timeframe:null, sentiment:null };
+  state.newPost = { image:null, video:null, mediaType:null, timeframe:null, sentiment:null };
   document.getElementById("drop-zone").classList.remove("has-img");
-  document.getElementById("drop-zone").innerHTML = `<div class="dz-label"><span class="em">📊</span>Tap to upload a chart screenshot</div>`;
+  document.getElementById("drop-zone").innerHTML = `<div class="dz-label"><span class="em">📊</span>Tap to upload a chart screenshot or video<br><span style="text-decoration:underline;">or drag &amp; drop here</span></div>`;
   document.getElementById("in-ticker").value = "";
   document.getElementById("in-caption").value = "";
   document.getElementById("posting-as").innerHTML = avatarHtml(state.currentUser.name, state.currentUser.color, "sm", state.currentUser.avatarUrl) + `<span>${escapeHtml(state.currentUser.name)}</span>`;
@@ -135,7 +203,7 @@ function selectSentiment(s){ state.newPost.sentiment = s; document.querySelector
 async function submitPost(){
   const ticker = document.getElementById("in-ticker").value.trim();
   const caption = document.getElementById("in-caption").value.trim();
-  if(!state.newPost.image){ showToast("Add a chart image first"); return; }
+  if(!state.newPost.image && !state.newPost.video){ showToast("Add a chart image or video first"); return; }
   if(!ticker){ showToast("Enter a ticker symbol"); return; }
   if(!state.newPost.sentiment){ showToast("Pick a sentiment"); return; }
   if(!state.newPost.timeframe){ showToast("Pick a timeframe"); return; }
@@ -146,12 +214,16 @@ async function submitPost(){
     const { data, error } = await sb.from("posts").insert({
       author_id: state.currentUser.id,
       ticker, sentiment: state.newPost.sentiment, timeframe: state.newPost.timeframe,
-      caption, image_data_url: state.newPost.image,
+      caption,
+      image_data_url: state.newPost.image,
+      media_type: state.newPost.mediaType || "image",
+      video_url: state.newPost.video,
     }).select().maybeSingle();
     if(error) throw error;
     state.posts.unshift({
       id: data.id, ticker: data.ticker, sentiment: data.sentiment, timeframe: data.timeframe,
       caption: data.caption || "", imageDataUrl: data.image_data_url,
+      mediaType: data.media_type || "image", videoUrl: data.video_url || null,
       authorId: data.author_id, author: state.currentUser.name, createdAt: data.created_at,
       likes: 0, comments: [],
       entryPrice: null, entryPriceLive: false,
@@ -202,7 +274,7 @@ function renderFeed(){
   feedEl.innerHTML = list.map(p => `
     <div class="post-card" onclick="openDetail('${p.id}')">
       <div class="post-thumb">
-        <img src="${p.imageDataUrl}" alt="${escapeHtml(p.ticker)} chart" loading="lazy">
+        ${mediaThumbHtml(p)}
         <div class="sent-badge ${p.sentiment}">${sentArrow(p.sentiment)} $${escapeHtml(p.ticker)}</div>
         <div class="tf-badge">${escapeHtml(p.timeframe)}</div>
       </div>
@@ -258,7 +330,7 @@ function openDetail(id){
   const isMine = state.currentUser && p.authorId === state.currentUser.id;
   const liked = state.likedPosts.includes(id);
   document.getElementById("detail-body").innerHTML = `
-    <img class="detail-img" src="${p.imageDataUrl}" alt="${escapeHtml(p.ticker)} chart" onclick="openLightbox('${p.imageDataUrl.replace(/'/g,"\\'")}')">
+    ${mediaDetailHtml(p)}
     <div class="badge-row">
       <span class="badge ${p.sentiment}">${sentArrow(p.sentiment)} $${escapeHtml(p.ticker)}</span>
       <span class="badge tf">${escapeHtml(p.timeframe)}</span>
