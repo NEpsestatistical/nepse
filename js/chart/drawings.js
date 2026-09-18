@@ -24,6 +24,7 @@
     _bind(){
       this._chartClick=(param)=>{
         if(this.tool==="cursor"||this.locked)return;
+        if(this._suppressNextClick){this._suppressNextClick=false;return;}
         const point=param&&param.point;
         if(!point||point.x==null||point.y==null)return;
         this._placeAt(Number(point.x),Number(point.y));
@@ -34,6 +35,7 @@
       this.chart.subscribeClick(this._chartClick);
       this._domClick=(e)=>{
         if(this.tool==="cursor"||this.locked)return;
+        if(this._suppressNextClick){this._suppressNextClick=false;return;}
         if(e.button!=null && e.button!==0)return;
         const r=this.container.getBoundingClientRect();
         const x=e.clientX-r.left, y=e.clientY-r.top;
@@ -45,6 +47,51 @@
       this.container.addEventListener("click",this._domClick,true);
       this._move=()=>this.render();
       this.chart.timeScale().subscribeVisibleLogicalRangeChange(this._move);
+
+      // --- Single-gesture "press, drag, release" placement -------------------
+      // Lets people draw a line/rectangle/fib the way every trading platform
+      // works: press, drag, release — instead of two separate clicks. A plain
+      // click (no drag) still falls back to the old click-then-click flow,
+      // which is what multi-point tools like the channel's 3rd point use.
+      this._toolPointerDown=(e)=>{
+        if(this.tool==="cursor"||this.locked||this.hidden)return;
+        if(e.button!=null&&e.button!==0)return;
+        if(this.points.length>0)return; // already mid-placement (e.g. channel's 2nd/3rd point) — let click flow handle it
+        const r=this.container.getBoundingClientRect();
+        const x=e.clientX-r.left,y=e.clientY-r.top;
+        if(x<0||y<0||x>r.width||y>r.height)return;
+        this._dragStartPixel={x,y};this._dragMoved=false;
+      };
+      this._toolPointerMove2=(e)=>{
+        if(!this._dragStartPixel||this.tool==="cursor")return;
+        const r=this.container.getBoundingClientRect();
+        const x=e.clientX-r.left,y=e.clientY-r.top;
+        const dx=x-this._dragStartPixel.x,dy=y-this._dragStartPixel.y;
+        if(!this._dragMoved&&Math.hypot(dx,dy)<4)return;
+        this._dragMoved=true;
+        const a=this._anchor(this._dragStartPixel.x,this._dragStartPixel.y),b=this._anchor(x,y);
+        if(!a||!b)return;
+        this._previewDrawing=this._buildDrawing(a,b,[a,b]);
+        this.render();
+      };
+      this._toolPointerUp2=(e)=>{
+        if(!this._dragStartPixel)return;
+        const startPixel=this._dragStartPixel;this._dragStartPixel=null;
+        this._previewDrawing=null;
+        if(!this._dragMoved){this.render();return;} // treat as a plain click — native click handler places point A as before
+        this._dragMoved=false;
+        const r=this.container.getBoundingClientRect();
+        const x=e.clientX-r.left,y=e.clientY-r.top;
+        const a=this._anchor(startPixel.x,startPixel.y),b=this._anchor(x,y);
+        if(!a||!b){this.render();return;}
+        const need=POINTS_NEEDED[this.tool]||2;
+        this.points=[a,b];
+        this._suppressNextClick=true; // the click that follows this pointerup shouldn't also place a point
+        if(this.points.length>=need)this._finish();else this.render();
+      };
+      this.container.addEventListener("pointerdown",this._toolPointerDown,true);
+      this.container.addEventListener("pointermove",this._toolPointerMove2);
+      this.container.addEventListener("pointerup",this._toolPointerUp2,true);
 
       this._pointerMove=(e)=>this._dragMove(e);
       this._pointerUp=(e)=>this._dragEnd(e);
@@ -96,16 +143,21 @@
       this.render();
     }
 
-    _finish(){
-      const a=this.points[0],b=this.points[1]||a;
+    _buildDrawing(a,b,pts){
       let d={id:"d"+Date.now()+Math.random().toString(16).slice(2),type:this.tool,a,b,color:COLORS[this.drawings.length%COLORS.length],width:2};
-      if(this.tool==="text")d.text=prompt("Text:","")||"";
       if(this.tool==="horizontal")d.b={time:b.time,price:a.price};
       if(this.tool==="vertical")d.b={time:a.time,price:b.price};
       if(this.tool==="fib")d.levels=FIB_LEVELS.slice();
       if(this.tool==="fibext")d.levels=FIBEXT_LEVELS.slice();
       if(this.tool==="measure"){d.deltaPrice=b.price-a.price;d.deltaPct=a.price?d.deltaPrice/a.price*100:0;}
-      if(this.tool==="channel"){d.b=this.points[1];d.c=this.points[2]||this.points[1];}
+      if(this.tool==="channel"){const p=pts||this.points;d.b=p[1]||b;d.c=p[2]||d.b;}
+      return d;
+    }
+
+    _finish(){
+      const a=this.points[0],b=this.points[1]||a;
+      let d=this._buildDrawing(a,b);
+      if(this.tool==="text")d.text=prompt("Text:","")||"";
       this.drawings.push(d);this.points=[];this.tool="cursor";this.container.classList.remove("ntc-drawing-active");
       this.save();this.onChange(this.drawings);this.render();
     }
@@ -178,13 +230,14 @@
       return best;
     }
 
-    _drawCommon(d){const c={stroke:d.color,fill:"none","stroke-width":d.width||1,"vector-effect":"non-scaling-stroke"};if(d.dash==="dashed")c["stroke-dasharray"]="6 4";else if(d.dash==="dotted")c["stroke-dasharray"]="1.5 4";return c}
+    _drawCommon(d){const c={stroke:d.color,fill:"none","stroke-width":d.width||1,"vector-effect":"non-scaling-stroke",opacity:d===this._previewDrawing?.65:1};if(d.dash==="dashed")c["stroke-dasharray"]="6 4";else if(d.dash==="dotted")c["stroke-dasharray"]="1.5 4";else if(d===this._previewDrawing)c["stroke-dasharray"]="5 4";return c}
 
     render(){
       this.svg.innerHTML="";
       this.svg.style.pointerEvents="none";
       if(this.hidden)return;
-      for(const d of this.drawings){
+      const list=this._previewDrawing?[...this.drawings,this._previewDrawing]:this.drawings;
+      for(const d of list){
         const a=this._xy(d.a),b=this._xy(d.b);if(a.x==null||a.y==null||b.x==null||b.y==null)continue;
         const common=this._drawCommon(d), selected=this.selected===d.id;
         if(d.type==="trend"||d.type==="ray"){
@@ -318,6 +371,8 @@
       this.drawings.splice(idx,1);this.selected=null;this.save();this.onChange(this.drawings);this.render();this.onSelect(null,this);return true;
     }
 
+    cancelDraw(){this.points=[];this._previewDrawing=null;this._dragStartPixel=null;this._dragMoved=false;this.tool="cursor";this.container.classList.remove("ntc-drawing-active");this.render();}
+
     load(symbol){try{const all=JSON.parse(localStorage.getItem(KEY())||"{}");this.drawings=Array.isArray(all[symbol])?all[symbol]:[];}catch(e){this.drawings=[]}this.selected=null;this.render()}
     save(){try{const all=JSON.parse(localStorage.getItem(KEY())||"{}");all[this.symbol]=this.drawings;localStorage.setItem(KEY(),JSON.stringify(all))}catch(e){}}
     setSymbol(symbol){this.symbol=symbol;this.points=[];this.selected=null;this.load(symbol)}
@@ -330,6 +385,9 @@
       try{this.chart.unsubscribeClick(this._chartClick)}catch(e){}
       this.chart.timeScale().unsubscribeVisibleLogicalRangeChange(this._move);
       this.container.removeEventListener("click",this._domClick,true);
+      this.container.removeEventListener("pointerdown",this._toolPointerDown,true);
+      this.container.removeEventListener("pointermove",this._toolPointerMove2);
+      this.container.removeEventListener("pointerup",this._toolPointerUp2,true);
       this.container.removeEventListener("pointerdown",this.documentPointerDown,true);
       document.removeEventListener("pointermove",this._pointerMove);
       document.removeEventListener("pointerup",this._pointerUp);

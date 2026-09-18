@@ -573,7 +573,7 @@
         const tag=(document.activeElement&&document.activeElement.tagName||"").toLowerCase();
         if(["input","textarea","select"].includes(tag))return;
         e.preventDefault();drawings.deleteSelected();
-      } else if(e.key==="Escape"){drawings.deselect();}
+      } else if(e.key==="Escape"){if(drawings.tool!=="cursor")drawings.cancelDraw();else drawings.deselect();}
     });
     els.fitBtn.addEventListener("click",()=>engine&&engine.autoscale());
     els.logBtn.addEventListener("click",()=>{
