@@ -6,3 +6,17 @@
 .ntc-theme-list button:hover{background:var(--ntc-accent-dim)}
 .ntc-theme-list button.active{color:var(--ntc-accent)}
 .ntc-theme-swatch{width:11px;height:11px;border-radius:50%;border:1px solid var(--ntc-border);flex-shrink:0}
+
+/* Drawing settings popover (color / width / lock / delete) */
+.ntc-drawing-panel{position:fixed;z-index:200;min-width:180px;background:var(--ntc-panel);border:1px solid var(--ntc-border);border-radius:8px;box-shadow:0 10px 26px var(--ntc-shadow,rgba(0,0,0,.45));padding:8px;font-size:12px}
+.ntc-dp-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ntc-dp-row+.ntc-dp-row{margin-top:7px}
+.ntc-dp-swatch{width:18px;height:18px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0}
+.ntc-dp-swatch.active{border-color:var(--ntc-text)}
+.ntc-dp-width{background:none;border:1px solid var(--ntc-border);border-radius:4px;width:30px;height:20px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.ntc-dp-width span{display:block;width:18px;background:var(--ntc-text);border-radius:2px}
+.ntc-dp-width.active{border-color:var(--ntc-accent,#2962FF)}
+.ntc-dp-actions{justify-content:space-between}
+.ntc-dp-lock,.ntc-dp-delete{background:none;border:1px solid var(--ntc-border);border-radius:4px;color:var(--ntc-text);padding:4px 8px;cursor:pointer;font-size:11.5px}
+.ntc-dp-lock:hover,.ntc-dp-delete:hover{background:var(--ntc-accent-dim)}
+.ntc-dp-delete:hover{color:#EF5350;border-color:#EF5350}
