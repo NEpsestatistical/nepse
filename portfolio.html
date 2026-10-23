@@ -2,15 +2,16 @@
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Portfolio Pro · NEPSE</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--ink:#111827;--mut:#6b7280;--line:#e5e7eb;--gold:#8a6a12;--goldbg:#fbf3dc;--up:#047857;--dn:#b91c1c;--blue:#2563eb;--grn:#16a34a}
-@media(prefers-color-scheme:dark){:root{--bg:#0b0e11;--card:#14181c;--ink:#edeff1;--mut:#9ba3ab;--line:#2a3138;--gold:#e0b84a;--goldbg:#2a2412;--up:#34d399;--dn:#f87171}}
+:root{--bg:#07090b;--card:#101317;--ink:#edeff1;--mut:#8b949e;--line:#232a31;--gold:#e0b84a;--goldbg:#2a2412;--up:#34d399;--dn:#f87171;--blue:#3b82f6;--grn:#22c55e}
+[hidden]{display:none!important}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 Inter,system-ui,sans-serif}
 .up{color:var(--up)}.dn{color:var(--dn)}.mut{color:var(--mut)}
-header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+header{display:flex;background:var(--bg)!important;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
 .logo{font-weight:800;font-size:18px}.logo small{display:block;font:600 9px monospace;letter-spacing:.12em;color:var(--mut)}
-select,input,button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
-button{cursor:pointer;font-weight:600}.gold{background:var(--goldbg);color:var(--gold);border-color:var(--gold)}.solid{background:var(--gold);color:#fff;border-color:var(--gold)}
+select,input,button,textarea{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+button{cursor:pointer;font-weight:600}.gold{background:var(--goldbg);color:var(--gold);border-color:var(--gold)}.solid{background:var(--gold);color:#111;border-color:var(--gold)}
 .sp{flex:1}main{max-width:1280px;margin:auto;padding:16px}
 .kp{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:10px}
 .k{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:default}.k.click{cursor:pointer}.k.click:hover{border-color:var(--gold)}
@@ -36,7 +37,7 @@ form.f{display:grid;gap:10px;grid-template-columns:1fr 1fr}form.f label{font-siz
 <div id="gate" hidden><h2>Portfolio Pro</h2><input id="em" type="email" placeholder="Email"><input id="pw" type="password" placeholder="Password"><button class="solid" id="login">Sign in</button><div id="gm" class="mut"></div></div>
 <div id="app" hidden>
 <header><div class="logo">PORTFOLIO<small>NEPSE · WACC ACCOUNTING</small></div>
-<select id="pf"></select><button class="gold" id="addTx">＋ Buy / Sell Entry</button>
+<select id="pf"></select><button class="gold" id="addTx">＋ Buy / Sell Entry ▾</button><input type="file" id="tmsf" accept=".xlsx,.xls,.csv" hidden><button id="rep">⬇ Export CSV</button>
 <span class="sp"></span><select id="per"><option value="1">1M</option><option value="3">3M</option><option value="6">6M</option><option value="12">1Y</option><option value="0" selected>All</option></select>
 <span class="mut" id="stat"></span><button id="out">Sign out</button></header>
 <main>
@@ -44,6 +45,9 @@ form.f{display:grid;gap:10px;grid-template-columns:1fr 1fr}form.f label{font-siz
 <div class="panel"><div class="bar"><div><h2>Holdings</h2><span class="mut" id="pname"></span></div><select id="fs"></select><select id="fc"></select><button id="clr">✕ Clear</button></div>
 <div class="tw"><table><thead id="hh"></thead><tbody id="hb"></tbody><tfoot id="hf"></tfoot></table></div></div>
 <div class="panel"><h2>Sector allocation</h2><div class="tw"><table><thead><tr><th class="l">Sector</th><th>Holdings</th><th>Kitta</th><th>Investment</th><th>Market Value</th><th>Unrealized P/L</th><th>Allocation</th></tr></thead><tbody id="sb"></tbody><tfoot id="sf"></tfoot></table></div><div class="charts" id="ch"></div></div>
+<div class="panel"><div class="bar"><div><h2>🎁 Unlisted bonus &amp; rights shares</h2><span class="mut">Not in holdings totals until listed and confirmed</span></div></div><div class="tw"><table><thead><tr><th class="l">Type</th><th class="l">Symbol</th><th>Book close</th><th>%</th><th>Kitta</th><th>WACC</th><th>Investment</th><th class="l">Status</th><th>Action</th></tr></thead><tbody id="pb"></tbody></table></div></div>
+<div class="panel"><div class="bar"><div><h2>Dividends</h2><span class="mut" id="dtot"></span></div><span class="sp"></span><button class="gold" onclick="divForm()">＋ Add dividend</button></div><div class="tw"><table><thead><tr><th class="l">Date</th><th class="l">Symbol</th><th>Amount</th><th class="l">Note</th><th></th></tr></thead><tbody id="db"></tbody></table></div></div>
+<div class="panel"><div class="bar"><div><h2>Transaction report</h2><span class="mut">All trades · charges · cumulative WACC</span></div><span class="sp"></span><select id="ts"></select></div><div class="tw"><table><thead><tr><th class="l">Date</th><th class="l">Symbol</th><th class="l">Type</th><th>Qty</th><th>Rate</th><th>Gross</th><th>Charges</th><th>Profit before tax</th><th>CGT</th><th>Net P/L</th><th>WACC after</th></tr></thead><tbody id="tb"></tbody></table></div></div>
 </main></div><div id="mod"></div>
 <script>
 const WORKER="https://shiny-term-f599.bharatiaashish43.workers.dev";
@@ -87,7 +91,7 @@ function calc(){
  return{rows,H,T,ev:E,inv,mv,pv,upl,day,rp,rl,nr,nw:wins.length,nl:loss.length,divs,total:upl+nr,overall:upl+nr+divs,cgt:E.reduce((s,e)=>s+e.cgt,0),comm:E.reduce((s,e)=>s+e.chg,0)}}
 /* ---- render ---- */
 function render(){
- if(!cur$())return;const d=calc();window.D=d;
+ if(!cur$())return;const d=calc();window.D=d;setTimeout(extras,0);
  const kc=(t,v,sub,cls="",extra="",on="")=>`<div class="k ${extra}" ${on}><b>${t}</b><div class="v ${cls}">${v}</div><small>${sub}</small></div>`;
  const pp=(a,b)=>b?a/b*100:0;
  $("k1").innerHTML=kc("Market value","Rs "+R(d.mv),`<span class="pill ${C(d.mv-d.inv)}">${S(pp(d.mv-d.inv,d.inv),2)}%</span>vs. investment`)+kc("Investment","Rs "+R(d.inv),d.rows.length+" active holdings")+
@@ -125,11 +129,22 @@ function render(){
  <svg width="${Math.max(300,gs.length*70+40)}" height="160"><text x="0" y="10" font-size="10" fill="#2563eb">■ Investment</text><text x="80" y="10" font-size="10" fill="#c9a84a">■ Market Value</text><g transform="translate(0,6)">${bars}</g></svg>`;
 }
 window.srt=k=>{sortD=sortK==k?-sortD:-1;sortK=k;render()};
+
+/* ---- live symbol search (uses the price worker's /all board) ---- */
+async function ensureBoard(){if(Object.keys(board).length<5){try{const j=await(await fetch(WORKER+"/all")).json();(j.board||[]).forEach(r=>r.symbol&&(board[r.symbol.toUpperCase()]=r))}catch(e){}}}
+function symSearch(inp,onPick){const w=inp.parentNode;w.style.position="relative";const box=document.createElement("div");box.className="menu";box.style.cssText="display:none;left:0;top:100%;width:100%;max-height:280px;overflow:auto";w.appendChild(box);inp.autocomplete="off";
+ const nm=r=>String(r.name||r.companyName||"");
+ const show=()=>{const q=inp.value.trim().toUpperCase();if(!q){box.style.display="none";return}
+  const m=Object.values(board).filter(r=>r.symbol&&(r.symbol.toUpperCase().startsWith(q)||nm(r).toUpperCase().includes(q))).sort((a,b)=>(b.symbol.toUpperCase().startsWith(q)?1:0)-(a.symbol.toUpperCase().startsWith(q)?1:0)||a.symbol.localeCompare(b.symbol)).slice(0,10);
+  box.innerHTML=m.map(r=>`<div data-s="${esc(r.symbol)}"><b>${esc(r.symbol)}</b> <small class="mut">${esc(nm(r))}${r.sector?" · "+esc(r.sector):""} · Rs ${R(r.ltp,2)}</small></div>`).join("")||`<div class="mut">${Object.keys(board).length?"No match in the live board":"Loading market list…"}</div>`;box.style.display="block"};
+ inp.addEventListener("input",show);inp.addEventListener("focus",show);inp.addEventListener("blur",()=>setTimeout(()=>box.style.display="none",180));
+ box.addEventListener("mousedown",e=>{const s=e.target.closest("[data-s]")?.dataset.s;if(s){e.preventDefault();inp.value=s;box.style.display="none";onPick&&onPick(s)}});
+ ensureBoard().then(()=>{if(document.activeElement===inp)show()})}
 /* ---- menus & modals ---- */
 const closeMenu=()=>{menuEl&&menuEl.remove();menuEl=null};document.addEventListener("click",e=>{if(!e.target.closest(".menu")&&!e.target.closest("button"))closeMenu()});
 window.menu=(e,s)=>{e.stopPropagation();closeMenu();const m=menuEl=document.createElement("div");m.className="menu";const r=e.target.getBoundingClientRect();m.style.left=r.left+scrollX+"px";m.style.top=r.bottom+scrollY+"px";
- m.innerHTML=`<div style="color:var(--up)" data-a="buy">⊕ Buy more</div><div style="color:var(--dn)" data-a="sell">⊖ Sell</div><div style="color:var(--gold)" data-a="bonus">🎁 Bonus / rights</div><div style="color:var(--gold)" data-a="detail">▤ Transaction detail</div><div style="color:var(--dn)" data-a="del">🗑 Delete stock</div>`;
- m.onclick=ev=>{const a=ev.target.dataset.a;closeMenu();if(a==="detail")detail(s);else if(a==="del")delStock(s);else entry(s,a)};document.body.appendChild(m)};
+ m.innerHTML=`<div style="color:var(--up)" data-a="buy">⊕ Buy more</div><div style="color:var(--dn)" data-a="sell">⊖ Sell</div><div style="color:var(--gold)" data-a="bonus">🎁 Bonus / rights</div><div style="color:var(--gold)" data-a="wacc">✎ Edit WACC / quantity</div><div style="color:var(--gold)" data-a="detail">▤ Transaction detail</div><div style="color:var(--dn)" data-a="del">🗑 Delete stock</div>`;
+ m.onclick=ev=>{const a=ev.target.dataset.a;closeMenu();if(a==="detail")detail(s);else if(a==="del")delStock(s);else if(a==="bonus")pendForm(s);else if(a==="wacc")waccForm(s);else entry(s,a)};document.body.appendChild(m)};
 const modal=h=>{$("mod").innerHTML=`<div class="ov" onclick="if(event.target===this)closeM()"><div class="md">${h}</div></div>`};window.closeM=()=>$("mod").innerHTML="";
 const kv=(a,b,c="",t="")=>`<div class="r ${t}"><span>${a}</span><b class="${c}">${b}</b></div>`;
 window.detail=(s,tab="sum")=>{closeMenu();const d=D,h=d.H[s],T=d.T[s]||[];if(!h)return;const ltp=(board[s]||{}).ltp;
@@ -148,22 +163,65 @@ window.realized=kind=>{const d=D;let E=d.ev;if(kind==="profit")E=E.filter(e=>e.n
  <div class="g" style="margin:10px 0"><div class="k"><b>Total</b><div class="v">Rs ${R(E.reduce((s,e)=>s+e.net,0))}</div></div><div class="k"><b>Active days</b><div class="v">${L.length}</div></div><div class="k"><b>Avg / active day</b><div class="v">Rs ${R(L.length?E.reduce((s,e)=>s+e.net,0)/L.length:0)}</div></div><div class="k"><b>Biggest day · ${big.date||"—"}</b><div class="v">Rs ${R(big.v||0)}</div></div></div>
  <div class="tw"><table><thead><tr><th class="l">DATE</th><th>REALIZED</th><th>TRADES</th><th class="l">SYMBOLS</th></tr></thead><tbody>${L.map(x=>`<tr><td class="l">${x.date}</td><td class="${C(x.v)}"><b>Rs ${R(x.v)}</b></td><td>${x.n}</td><td class="l">${[...x.s].join(", ")}</td></tr>`).join("")||`<tr><td colspan=4 class="mut">No sells in this period.</td></tr>`}</tbody></table></div>
  <div class="bar"><span class="mut">Totals reflect the selected period. Net = profit before tax − CGT.</span><span class="sp"></span><button class="solid" onclick="closeM()">Done</button></div>`)};
-window.entry=(sym="",kind="buy")=>{const bonus=kind==="bonus";
+window.entry=(sym="",kind="buy",pre={})=>{const bonus=kind==="bonus";
  modal(`<div class="bar"><h3>${bonus?"Bonus / rights":kind==="sell"?"Sell":"Buy"} entry</h3><span class="sp"></span><button onclick="closeM()">✕</button></div>
- <form class="f" id="ef"><div><label>Symbol</label><input name="s" value="${sym}" style="text-transform:uppercase" required></div>
+ <form class="f" id="ef"><div><label>Symbol — type code or company name</label><input name="s" value="${sym}" style="text-transform:uppercase" placeholder="e.g. NIMB or Nepal Investment" required></div>
  <div><label>Type</label><select name="k"><option value="buy" ${kind==="buy"?"selected":""}>Buy</option><option value="sell" ${kind==="sell"?"selected":""}>Sell</option><option value="bonus" ${bonus?"selected":""}>Bonus shares (Rs 0)</option><option value="rights">Rights shares</option></select></div>
- <div><label>Quantity (kitta)</label><input name="q" type="number" min="1" required></div><div><label>Rate (Rs)</label><input name="p" type="number" step="0.01" min="0" value="${bonus?0:""}"></div>
- <div><label>Date (AD)</label><input name="d" type="date" value="${new Date().toISOString().slice(0,10)}" required></div>
+ <div><label>Quantity (kitta)</label><input name="q" type="number" min="1" value="${pre.q||""}" required></div><div><label>Rate (Rs)</label><input name="p" type="number" step="0.01" min="0" value="${bonus?0:pre.p||""}"></div>
+ <div><label>Date (AD)</label><input name="d" type="date" value="${pre.d||new Date().toISOString().slice(0,10)}" required></div>
  <div><label>Total charges override (optional)</label><input name="f" type="number" step="0.01" placeholder="auto: commission + SEBON + DP"></div>
- <div style="grid-column:1/-1" id="pv" class="mut"></div><div style="grid-column:1/-1"><button class="solid" type="submit">Save entry</button></div></form>`);
+ <div style="grid-column:1/-1" id="hint" class="mut"></div><div style="grid-column:1/-1" id="pv" class="mut"></div><div style="grid-column:1/-1"><button class="solid" type="submit">Save entry</button></div></form>`);
  const f=$("ef"),pv=()=>{const q=+f.q.value,p=+f.p.value,g=q*p;pv_.textContent=q&&p?`Gross Rs ${R(g,2)} · est. charges Rs ${R(comm(g)+g*CFG.sebon+CFG.dp,2)}`:""},pv_=$("pv");f.oninput=pv;
+ const pick=s=>{const b=board[s.toUpperCase()];$("hint").innerHTML=b?`<b>${esc(s.toUpperCase())}</b> · ${esc(b.name||b.companyName||"")} · ${esc(b.sector||"")} · LTP <b>Rs ${R(b.ltp,2)}</b> <span class="${C(+b.percentChange)}">(${S(+b.percentChange,2)}%)</span>`:`<span class="dn">“${esc(s)}” not found in the live market list</span>`;if(b&&!f.p.value&&f.k.value!=="bonus"&&b.ltp)f.p.value=b.ltp;pv()};
+ symSearch(f.s,pick);f.s.addEventListener("change",()=>f.s.value&&pick(f.s.value));if(sym)ensureBoard().then(()=>pick(sym));else setTimeout(()=>f.s.focus(),50);
  f.onsubmit=async e=>{e.preventDefault();let k=f.k.value;const t={id:newId(),symbol:f.s.value.trim().toUpperCase(),side:k==="sell"?"sell":"buy",qty:+f.q.value,price:k==="bonus"?0:+f.p.value,date:f.d.value,fees:f.f.value===""?null:+f.f.value,note:k==="bonus"?"Bonus":k==="rights"?"Rights":"",auto:f.f.value===""};
+ if(Object.keys(board).length>5&&!board[t.symbol]&&!confirm(t.symbol+" is not in the live market list. Add it anyway?"))return;
  if(k==="sell"){const h=D.H[t.symbol];if(!h||h.q<t.qty){alert("You hold "+(h?h.q:0)+" kitta of "+t.symbol+" — can't sell "+t.qty);return}}
  cur$().transactions.push(t);await save();closeM();render()}};
-$("addTx").onclick=()=>entry();
+$("addTx").onclick=e=>{e.stopPropagation();closeMenu();const m=menuEl=document.createElement("div");m.className="menu";const r=e.target.getBoundingClientRect();m.style.left=r.left+scrollX+"px";m.style.top=r.bottom+scrollY+"px";m.style.minWidth="290px";
+ m.innerHTML=`<div data-a="m">✎ <b>Manual entry</b><br><small class="mut">Enter buys / sells by hand</small></div><div data-a="t">⬆ <b>Upload from TMS</b><br><small class="mut">Bulk-add trades from a TMS .xlsx / .csv</small></div><div data-a="s">💬 <b>Read SMS</b><br><small class="mut">Paste a broker confirmation SMS to auto-fill</small></div><div data-a="d">₹ <b>Add dividend</b></div>`;
+ m.onclick=ev=>{const a=ev.target.closest("[data-a]")?.dataset.a;closeMenu();if(a==="m")entry();else if(a==="t")$("tmsf").click();else if(a==="s")smsForm();else if(a==="d")divForm()};document.body.appendChild(m)};
 window.delTx=async id=>{if(!confirm("Delete this transaction? Holdings recalculate automatically."))return;const p=cur$();p.transactions=p.transactions.filter(t=>t.id!=id);await save();render();closeM()};
 window.delStock=async s=>{if(!confirm(`Delete ALL transactions of ${s} from "${cur$().name}"? A backup file downloads first.`))return;backup();const p=cur$();p.transactions=p.transactions.filter(t=>t.symbol.toUpperCase()!==s);await save();render()};
 function backup(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify({exportedAt:new Date().toISOString(),portfolios:PF},null,2)],{type:"application/json"}));a.download="portfolio-backup-"+Date.now()+".json";a.click()}
+
+/* ---- Chukul-style extras: pending bonus/rights, dividends, SMS, TMS upload, edit WACC, report ---- */
+const today=()=>new Date().toISOString().slice(0,10);
+window.pendForm=s=>{const h=D.H[s];modal(`<div class="bar"><h3>Bonus / rights · ${s}</h3><span class="sp"></span><button onclick="closeM()">✕</button></div><form class="f" id="pf2"><div><label>Type</label><select name="t"><option value="Bonus">Bonus (Rs 0)</option><option value="Rights">Rights (Rs 100 / kitta)</option></select></div><div><label>Percent (%)</label><input name="pc" type="number" step="0.01" required></div><div><label>Book close (AD)</label><input name="b" type="date" value="${today()}"></div><div><label>Rights price / kitta</label><input name="w" type="number" value="100"></div><div style="grid-column:1/-1" class="mut" id="pk">You hold ${h?h.q:0} kitta.</div><div style="grid-column:1/-1"><button class="solid">Add as pending (unlisted)</button></div></form>`);
+ const f=$("pf2");f.oninput=()=>$("pk").textContent="Kitta: "+Math.floor((h?h.q:0)*f.pc.value/100);
+ f.onsubmit=async e=>{e.preventDefault();const k=Math.floor((h?h.q:0)*f.pc.value/100);if(!k){alert("0 kitta at that %");return}(cur$().pending=cur$().pending||[]).push({id:newId(),type:f.t.value,symbol:s,book:f.b.value,pct:+f.pc.value,kitta:k,wacc:f.t.value==="Bonus"?0:+f.w.value});await save();closeM();render()}};
+window.pendDo=async(id,ok)=>{const p=cur$(),x=(p.pending||[]).find(y=>y.id==id);if(!x)return;if(ok)p.transactions.push({id:newId(),symbol:x.symbol,side:"buy",qty:x.kitta,price:x.wacc,date:today(),fees:0,note:x.type});p.pending=p.pending.filter(y=>y.id!=id);await save();render()};
+window.divForm=()=>{modal(`<div class="bar"><h3>Add dividend</h3><span class="sp"></span><button onclick="closeM()">✕</button></div><form class="f" id="df"><div><label>Symbol</label><input name="s" style="text-transform:uppercase" required></div><div><label>Net amount received (Rs)</label><input name="a" type="number" step="0.01" required></div><div><label>Date</label><input name="d" type="date" value="${today()}"></div><div><label>Note</label><input name="n" placeholder="e.g. cash dividend FY 82/83"></div><div style="grid-column:1/-1"><button class="solid">Save dividend</button></div></form>`);
+ symSearch($("df").s);$("df").onsubmit=async e=>{e.preventDefault();const f=e.target;(cur$().dividends=cur$().dividends||[]).push({id:newId(),symbol:f.s.value.trim().toUpperCase(),amount:+f.a.value,date:f.d.value,note:f.n.value});await save();closeM();render()}};
+window.delDiv=async id=>{if(!confirm("Delete dividend?"))return;const p=cur$();p.dividends=p.dividends.filter(d=>d.id!=id);await save();render()};
+window.waccForm=s=>{const h=D.H[s];modal(`<div class="bar"><h3>Edit WACC / quantity · ${s}</h3><span class="sp"></span><button onclick="closeM()">✕</button></div><p class="mut">Use this to match your real holding (e.g. old shares with no history). It records a zero-charge adjustment: sells the current ${h.q} kitta at WACC (P/L = 0) and re-buys your target.</p><form class="f" id="wf"><div><label>Target quantity</label><input name="q" type="number" value="${h.q}" required></div><div><label>Target WACC (Rs)</label><input name="w" type="number" step="0.01" value="${(h.c/h.q).toFixed(2)}" required></div><div style="grid-column:1/-1"><button class="solid">Apply</button></div></form>`);
+ $("wf").onsubmit=async e=>{e.preventDefault();const f=e.target,p=cur$(),w=h.c/h.q,d=today();p.transactions.push({id:newId(),symbol:s,side:"sell",qty:h.q,price:+w.toFixed(6),date:d,fees:0,note:"WACC adjust"},{id:newId(),symbol:s,side:"buy",qty:+f.q.value,price:+f.w.value,date:d,fees:0,note:"WACC adjust"});await save();closeM();render()}};
+function parseSms(t){const side=/\b(sell|sold|sale)\b/i.test(t)?"sell":"buy",U=(t.toUpperCase().match(/\b[A-Z]{2,10}\b/g)||[]).find(x=>board[x]);
+ const q=(t.match(/(\d[\d,]*)\s*(?:units?|kitta|shares?|qty)\b/i)||t.match(/\bqty\.?\s*[:\-]?\s*(\d[\d,]*)/i)||[])[1],p=(t.match(/(?:rate|price|at|@)\s*[:\-]?\s*(?:rs\.?|npr)?\s*(\d[\d,]*\.?\d*)/i)||[])[1];
+ return{side,sym:U||"",q:q?+q.replace(/,/g,""):"",p:p?+p.replace(/,/g,""):""}}
+window.smsForm=()=>{modal(`<div class="bar"><h3>Read SMS</h3><span class="sp"></span><button onclick="closeM()">✕</button></div><p class="mut">Paste the broker confirmation SMS. I'll pull out symbol, side, quantity and rate — you confirm before saving.</p><textarea id="sms" rows="4" style="width:100%" placeholder="e.g. You bought 100 units of NIMB at Rs 205.50"></textarea><div class="bar"><button class="solid" id="smsgo">Read &amp; fill entry</button></div>`);
+ $("smsgo").onclick=()=>{const r=parseSms($("sms").value);if(!r.sym&&!r.q){alert("Couldn't find symbol or quantity in that text.");return}entry(r.sym,r.side,{q:r.q,p:r.p})}};
+$("tmsf").onchange=async e=>{const file=e.target.files[0];e.target.value="";if(!file)return;try{
+ const wb=XLSX.read(await file.arrayBuffer(),{type:"array",cellDates:true}),ws=wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(ws,{defval:""});
+ const key=(r,re)=>Object.keys(r).find(k=>re.test(k)),out=[];const p=cur$(),have=new Set(p.transactions.map(t=>[t.symbol,t.side,+t.qty,+t.price,t.date].join("|")));
+ rows.forEach(r=>{const ks=key(r,/symbol|scrip|stock|security/i),kq=key(r,/^(qty|quantity|kitta)|qty|quantity/i),kp=key(r,/rate|price/i),kd=key(r,/date/i),kt=key(r,/buy|sell|type|transaction|side/i);if(!ks||!kq||!kp)return;
+  const sym=String(r[ks]).trim().toUpperCase(),qty=Math.abs(+String(r[kq]).replace(/,/g,"")),price=+String(r[kp]).replace(/,/g,"");if(!sym||!qty||isNaN(price))return;
+  let side="buy";const tv=String(kt?r[kt]:"").toLowerCase();if(/sell|sale|sold|^s$/.test(tv))side="sell";else if(!/buy|purchase|^b$/.test(tv)&&+String(r[kq])<0)side="sell";
+  let d=r[kd];d=d instanceof Date?new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10):String(d).slice(0,10);if(!/^\d{4}-\d\d-\d\d$/.test(d))d=today();
+  const k=[sym,side,qty,price,d].join("|");if(have.has(k))return;have.add(k);out.push({id:newId(),symbol:sym,side,qty,price,date:d,fees:null,auto:true,note:"TMS import"})});
+ if(!out.length){alert("No new trades recognised. The sheet needs Symbol, Quantity and Rate columns (plus Buy/Sell and Date if available).");return}
+ if(!confirm(`Import ${out.length} new trades (${out.filter(t=>t.side=="buy").length} buys, ${out.filter(t=>t.side=="sell").length} sells) into "${p.name}"? Duplicates were skipped; charges are auto-calculated.`))return;
+ p.transactions.push(...out);await save();render()}catch(err){alert("Couldn't read that file: "+err.message)}};
+function extras(){const p=cur$(),d=D;
+ $("pb").innerHTML=(p.pending||[]).map(x=>`<tr><td class="l"><span class="pill up">${x.type}</span></td><td class="l"><b>${x.symbol}</b></td><td>${x.book||"—"}</td><td>${x.pct}%</td><td>${x.kitta}</td><td>${R(x.wacc,2)}</td><td>${R(x.kitta*x.wacc)}</td><td class="l" style="color:var(--gold)"><b>Eligible · waiting for listing</b></td><td><button class="gold" onclick="pendDo('${x.id}',1)">I received</button> <button onclick="pendDo('${x.id}',0)">Not eligible</button></td></tr>`).join("")||`<tr><td colspan="9" class="mut" style="text-align:center">Nothing pending. Use ⋮ → Bonus / rights on a holding.</td></tr>`;
+ const dv=[...(p.dividends||[])].sort((a,b)=>(b.date||"").localeCompare(a.date||""));$("dtot").textContent="Total received: Rs "+R(dv.reduce((s,x)=>s+(+x.amount||0),0),2);
+ $("db").innerHTML=dv.map(x=>`<tr><td class="l">${esc(x.date)}</td><td class="l"><b>${esc(x.symbol)}</b></td><td class="up">Rs ${R(x.amount,2)}</td><td class="l mut">${esc(x.note)}</td><td><button onclick="delDiv('${x.id}')" style="padding:2px 8px">✕</button></td></tr>`).join("")||`<tr><td colspan="5" class="mut" style="text-align:center">No dividends logged.</td></tr>`;
+ const all=Object.values(d.T).flat().sort((a,b)=>(b.date||"").localeCompare(a.date||"")),sel=$("ts").value;
+ $("ts").innerHTML=`<option value="">Symbol: All</option>`+Object.keys(d.T).sort().map(s=>`<option ${s==sel?"selected":""}>${s}</option>`).join("");
+ $("tb").innerHTML=all.filter(t=>!sel||t.sym===sel).map(t=>`<tr><td class="l">${esc(t.date)}</td><td class="l"><b>${t.sym}</b></td><td class="l ${t.side=="buy"?"up":"dn"}"><b>${t.side.toUpperCase()}</b>${t.note?` <small class="mut">${esc(t.note)}</small>`:""}</td><td>${R(t.qty)}</td><td>${R(t.price,2)}</td><td>${R(t.gross,2)}</td><td>${R(t.chg,2)}</td><td class="${C(t.pbt)}">${t.pbt==null?"—":R(t.pbt,2)}</td><td>${t.cgt?R(t.cgt,2):"—"}</td><td class="${C(t.net)}">${t.net==null?"—":R(t.net,2)}</td><td>${R(t.wacc,2)}</td></tr>`).join("")}
+$("ts").onchange=render;
+$("rep").onclick=()=>{const rows=[["Date","Symbol","Type","Qty","Rate","Gross","Charges","ProfitBeforeTax","CGT","NetPL","WACCAfter","Note"]];Object.values(D.T).flat().sort((a,b)=>(a.date||"").localeCompare(b.date||"")).forEach(t=>rows.push([t.date,t.sym,t.side,t.qty,t.price,t.gross.toFixed(2),t.chg.toFixed(2),t.pbt==null?"":t.pbt.toFixed(2),t.cgt==null?"":t.cgt.toFixed(2),t.net==null?"":t.net.toFixed(2),(t.wacc||0).toFixed(2),t.note||""]));
+ const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([rows.map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(",")).join("\n")],{type:"text/csv"}));a.download="transactions-"+today()+".csv";a.click()};
 /* ---- data ---- */
 async function save(){localStorage.setItem("ee_portfoliosV2_"+uid,JSON.stringify(PF));$("stat").textContent="saving…";
  const{error}=await sb.from("portfolio_data").upsert({user_id:uid,portfolios:PF,current_portfolio_id:cur,schema_version:2,updated_at:new Date().toISOString()},{onConflict:"user_id"});$("stat").textContent=error?"⚠ "+error.message:"synced ✓"}
