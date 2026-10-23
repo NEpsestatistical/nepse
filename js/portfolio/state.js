@@ -6,6 +6,11 @@ let realizedPL = 0;
 let prices = {};
 let prevPrices = {};
 
+/** @type {'unknown'|'synced'|'local_only'|'error'|'saving'} */
+let syncStatus = "unknown";
+let syncErrorMessage = "";
+let lastCloudSaveAt = null;
+
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
@@ -16,29 +21,66 @@ function fmt(n, d = 2) {
 
 function uid() { return Date.now() + Math.random().toString(36).slice(2, 8); }
 
-function defaultPortfolios() {
+/** Empty portfolio for new accounts — no demo holdings (avoids cross-account lookalikes). */
+function emptyPortfolios() {
   return [{
     id: uid(),
     name: "My Portfolio",
-    transactions: [
-      { id: uid(), symbol: "NABIL", side: "buy", qty: 50, price: 780, date: "2025-03-15", note: "" },
-      { id: uid(), symbol: "NICA", side: "buy", qty: 100, price: 410, date: null, note: "" },
-    ],
-    watchlist: [
-      { id: uid(), symbol: "CIT", targetPrice: 2200, targetType: "buy_below", note: "Accumulate on dip", createdAt: new Date().toISOString() },
-      { id: uid(), symbol: "SHIVM", targetPrice: 560, targetType: "sell_above", note: "Resistance target", createdAt: new Date().toISOString() },
-    ],
+    transactions: [],
+    watchlist: [],
     alerts: [],
+    dividends: [],
   }];
 }
 
 const SCHEMA_VERSION = 2;
 
 function migratePortfolios(fromVersion, data) {
-  return data;
+  if (!Array.isArray(data)) return emptyPortfolios();
+  return data.map((p) => ({
+    ...p,
+    transactions: Array.isArray(p.transactions) ? p.transactions : [],
+    watchlist: Array.isArray(p.watchlist) ? p.watchlist : [],
+    alerts: Array.isArray(p.alerts) ? p.alerts : [],
+    dividends: Array.isArray(p.dividends) ? p.dividends : [],
+  }));
 }
 
 function lsKey(name) { return `ee_${name}_${currentUserId}`; }
+
+function setSyncStatus(status, message) {
+  syncStatus = status;
+  syncErrorMessage = message || "";
+  if (typeof updateSyncBadgeUI === "function") updateSyncBadgeUI();
+  if (typeof updateSecAuditUI === "function") updateSecAuditUI();
+}
+
+function updateSyncBadgeUI() {
+  const el = document.getElementById("syncBadge");
+  if (!el) return;
+  const map = {
+    unknown: { text: "Sync: …", cls: "sync-unknown" },
+    saving: { text: "Sync: saving…", cls: "sync-saving" },
+    synced: { text: "Sync: cloud", cls: "sync-ok" },
+    local_only: { text: "Sync: local only", cls: "sync-warn" },
+    error: { text: "Sync: error", cls: "sync-err" },
+  };
+  const m = map[syncStatus] || map.unknown;
+  el.textContent = m.text;
+  el.className = "sync-badge label " + m.cls;
+  el.title = syncErrorMessage || (lastCloudSaveAt ? ("Last cloud save: " + lastCloudSaveAt) : "");
+  const banner = document.getElementById("syncBanner");
+  if (banner) {
+    if (syncStatus === "error" || syncStatus === "local_only") {
+      banner.style.display = "block";
+      banner.textContent = syncErrorMessage ||
+        "Cloud sync unavailable — this device keeps a local copy only. Export a backup. Fix Supabase portfolio_data + RLS to restore multi-device sync.";
+      banner.className = "sync-banner " + (syncStatus === "error" ? "err" : "warn");
+    } else {
+      banner.style.display = "none";
+    }
+  }
+}
 
 function loadLocalCache() {
   try {
@@ -53,38 +95,69 @@ function loadLocalCache() {
   } catch (e) {}
 }
 function saveLocalCache() {
+  if (!currentUserId) return;
   try {
     localStorage.setItem(lsKey("portfoliosV2"), JSON.stringify(portfolios));
     localStorage.setItem(lsKey("currentPortfolioId"), currentPortfolioId || "");
   } catch (e) {}
 }
 
+function formatSupabaseError(error) {
+  if (!error) return "Unknown cloud error";
+  const code = error.code || error.status || "";
+  const msg = error.message || String(error);
+  if (String(code) === "404" || /relation|does not exist|Not Found/i.test(msg)) {
+    return "Cloud table portfolio_data missing or not exposed (HTTP 404). Run the SQL migration in Supabase.";
+  }
+  if (/permission|RLS|row-level|policy/i.test(msg)) {
+    return "Cloud write blocked by RLS/permissions. Check policies on portfolio_data.";
+  }
+  return msg + (code ? " (" + code + ")" : "");
+}
+
 async function loadState() {
   loadLocalCache();
+  setSyncStatus("unknown");
+
+  if (!currentUserId) {
+    if (!portfolios.length) portfolios = emptyPortfolios();
+    setSyncStatus("local_only", "Not signed in.");
+    return;
+  }
 
   try {
     const { data, error } = await sb
       .from("portfolio_data")
-      .select("portfolios, current_portfolio_id, schema_version")
+      .select("portfolios, current_portfolio_id, schema_version, updated_at")
       .eq("user_id", currentUserId)
       .maybeSingle();
 
-    if (!error && data && Array.isArray(data.portfolios) && data.portfolios.length) {
-      portfolios = data.portfolios;
+    if (error) {
+      console.error("portfolio_data load error:", error);
+      if (!portfolios.length) portfolios = emptyPortfolios();
+      setSyncStatus("error", formatSupabaseError(error));
+    } else if (data && Array.isArray(data.portfolios) && data.portfolios.length) {
+      portfolios = migratePortfolios(data.schema_version || 1, data.portfolios);
       currentPortfolioId = data.current_portfolio_id;
-      const storedVersion = data.schema_version || 1;
-      if (storedVersion < SCHEMA_VERSION) portfolios = migratePortfolios(storedVersion, portfolios);
-    } else if (!portfolios.length) {
-      portfolios = defaultPortfolios();
+      setSyncStatus("synced", data.updated_at ? ("Loaded from cloud · " + data.updated_at) : "Loaded from cloud");
+    } else {
+      // No cloud row yet — keep local if present, else empty (not demo)
+      if (!portfolios.length) portfolios = emptyPortfolios();
+      setSyncStatus("synced", "No cloud row yet — will create on first save");
+      // Push empty/local up so row exists
+      saveState();
     }
   } catch (e) {
-    if (!portfolios.length) portfolios = defaultPortfolios();
+    console.error("portfolio_data load exception:", e);
+    if (!portfolios.length) portfolios = emptyPortfolios();
+    setSyncStatus("error", formatSupabaseError(e));
   }
 
   if (!currentPortfolioId || !portfolios.find((p) => p.id === currentPortfolioId)) {
     currentPortfolioId = portfolios[0].id;
   }
   saveLocalCache();
+  updateSyncBadgeUI();
 }
 
 let _saveTimer = null;
@@ -93,16 +166,26 @@ function saveState() {
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(async () => {
     if (!currentUserId) return;
+    setSyncStatus("saving");
     try {
-      await sb.from("portfolio_data").upsert({
+      const { error } = await sb.from("portfolio_data").upsert({
         user_id: currentUserId,
         portfolios,
         current_portfolio_id: currentPortfolioId,
         schema_version: SCHEMA_VERSION,
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
+
+      if (error) {
+        console.error("Portfolio sync failed, kept locally:", error);
+        setSyncStatus("error", formatSupabaseError(error));
+      } else {
+        lastCloudSaveAt = new Date().toISOString();
+        setSyncStatus("synced", "Saved to cloud · " + lastCloudSaveAt);
+      }
     } catch (e) {
       console.error("Portfolio sync failed, kept locally:", e);
+      setSyncStatus("error", formatSupabaseError(e));
     }
   }, 400);
 }
@@ -112,6 +195,8 @@ function getCurrentPortfolio() {
   if (p) {
     if (!Array.isArray(p.watchlist)) p.watchlist = [];
     if (!Array.isArray(p.alerts)) p.alerts = [];
+    if (!Array.isArray(p.dividends)) p.dividends = [];
+    if (!Array.isArray(p.transactions)) p.transactions = [];
   }
   return p;
 }
@@ -136,7 +221,7 @@ function createPortfolio() {
     defaultValue: "New Portfolio",
     confirmText: "Create",
     onSubmit: (name) => {
-      const p = { id: uid(), name: name.trim(), transactions: [] };
+      const p = { id: uid(), name: name.trim(), transactions: [], watchlist: [], alerts: [], dividends: [] };
       portfolios.push(p);
       switchPortfolio(p.id);
     },
@@ -204,18 +289,23 @@ function clearCurrentPortfolioData() {
   const p = getCurrentPortfolio();
   appConfirm({
     title: "Clear portfolio data?",
-    message: `Clear all holdings and transaction history for "${p.name}"? A backup file will download automatically first.`,
+    message: `Clear all holdings, transactions, watchlist, alerts, and dividends for "${p.name}"? A backup file will download automatically first.`,
     confirmText: "Clear",
     danger: true,
     onConfirm: () => {
       autoBackupBeforeDestruction("pre-clear");
       p.transactions = [];
+      p.watchlist = [];
+      p.alerts = [];
+      p.dividends = [];
       saveState();
       recompute();
       refresh();
       renderTransactions();
       renderPerformancePanel();
       renderDividends();
+      renderWatchlist();
+      evaluateAlerts();
     },
   });
 }
@@ -234,7 +324,8 @@ function recompute() {
     purchaseDate: h.purchaseDate,
   }));
   realizedPL = rpl;
-  document.getElementById("portfolioNameLabel").textContent = p.name;
+  const label = document.getElementById("portfolioNameLabel");
+  if (label) label.textContent = p.name;
 }
 
 function getRates() {
@@ -258,3 +349,7 @@ function holdingTermLabel(days) {
   return days > rates.thresholdDays ? "Long-term" : "Short-term";
 }
 
+/** Stable key for import dedup */
+function txDedupeKey(t) {
+  return [String(t.symbol || "").toUpperCase(), String(t.side || "").toLowerCase(), Number(t.qty), Number(t.price), t.date || ""].join("|");
+}
