@@ -1,1021 +1,183 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<script>
-  /* Safe fetch getter/setter guard to prevent 'Cannot set property fetch of #<Window> which has only a getter' */
-  (function() {
-    var globalObj = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : self);
-    var _activeFetch = typeof globalObj.fetch === 'function' ? globalObj.fetch : null;
-
-    try {
-      Object.defineProperty(globalObj, 'fetch', {
-        get: function() { return _activeFetch; },
-        set: function(fn) { _activeFetch = fn; },
-        configurable: true,
-        enumerable: true
-      });
-    } catch (e) {}
-
-    var originalDefineProperty = Object.defineProperty;
-    Object.defineProperty = function(obj, prop, descriptor) {
-      var isWin = (obj === globalObj || obj === globalObj.window || obj === globalObj.globalThis || obj === globalObj.self || (typeof Window !== 'undefined' && obj === Window.prototype));
-      if (isWin && prop === 'fetch') {
-        if (descriptor && descriptor.get && !descriptor.set) {
-          var customGetter = descriptor.get;
-          var customOverride = null;
-          return originalDefineProperty.call(Object, obj, prop, {
-            get: function() {
-              return customOverride || (typeof customGetter === 'function' ? customGetter.call(this) : customGetter);
-            },
-            set: function(v) {
-              customOverride = v;
-              _activeFetch = v;
-            },
-            configurable: true,
-            enumerable: descriptor.enumerable !== undefined ? descriptor.enumerable : true
-          });
-        }
-      }
-      return originalDefineProperty.apply(Object, arguments);
-    };
-  })();
-</script>
-<meta charset="UTF-8" />
-<title>NEPSE Portfolio</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Portfolio Pro · NEPSE</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="css/portfolio/buttons-cards.css" />
-<link rel="stylesheet" href="css/portfolio/tables-modals.css" />
-<link rel="stylesheet" href="css/portfolio/workspaces.css" />
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; min-height: 100vh; background: #0B0E11; color: #EDEFF1;
-    font-family: 'IBM Plex Mono', ui-monospace, monospace; padding: 28px 20px 60px;
-  }
-  .ee-brand { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; font-family: 'Inter', sans-serif; }
-  .ee-mark { width: 26px; height: 26px; border-radius: 7px; background: #3FA796; color: #0B0E11; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; }
-  .ee-brand-text { font-size: 12px; color: #6B7680; letter-spacing: .04em; }
-  .ee-brand-text b { color: #EDEFF1; }
-  .label { font-family: 'Inter', sans-serif; }
-  .wrap { max-width: 1040px; margin: 0 auto; }
-
-  /* Nav / views */
-  .app-view { display: none; }
-  .app-view.active { display: block; }
-  .app-nav { display: flex; gap: 4px; background: #14181C; border: 1px solid #2A3138; border-radius: 10px; padding: 4px; margin-bottom: 18px; overflow-x: auto; }
-  .app-nav-btn { background: none; border: none; color: #9BA3AB; font-size: 12.5px; font-weight: 600; padding: 8px 14px; border-radius: 7px; white-space: nowrap; }
-  .app-nav-btn:hover { color: #EDEFF1; background: #1D2329; }
-  .app-nav-btn.active { color: #0D1210; background: #3FA796; }
-  @media (max-width: 640px) {
-    .app-nav { position: sticky; top: 0; z-index: 20; }
-  }
-
-  /* Header */
-  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
-  .eyebrow { font-size: 11px; letter-spacing: .14em; color: #6B7680; text-transform: uppercase; margin-bottom: 8px; }
-  .total { font-size: 38px; font-weight: 600; letter-spacing: -.01em; }
-  .pl-row { display: flex; gap: 10px; align-items: center; margin-top: 6px; font-size: 14px; }
-  .up { color: #3FA796; } .down { color: #C4553D; }
-
-  /* Daily gain/loss bars */
-  .day-pl-strip { background: #1A1F24; border: 1px solid #2A3138; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
-  .day-pl-strip .label-col { font-family: 'Inter', sans-serif; }
-  .day-pl-strip .stat-label { font-family: 'Inter', sans-serif; font-size: 10px; letter-spacing: .1em; color: #6B7680; text-transform: uppercase; margin-bottom: 4px; }
-  .day-pl-strip .amt-row { display: flex; align-items: baseline; gap: 8px; }
-  .day-pl-strip .amt { font-size: 20px; font-weight: 600; font-family: 'IBM Plex Mono', monospace; }
-  .day-pl-strip .pct { font-size: 13px; font-family: 'Inter', sans-serif; }
-  .day-pl-bar-track { flex: 1 1 160px; height: 8px; background: #14181C; border-radius: 4px; overflow: hidden; position: relative; min-width: 120px; }
-  .day-pl-bar-fill { position: absolute; top: 0; bottom: 0; border-radius: 4px; transition: width .3s ease; }
-  .day-pl-bar-fill.up { background: #3FA796; left: 50%; }
-  .day-pl-bar-fill.down { background: #C4553D; right: 50%; }
-  .day-pl-bar-track .mid-line { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #2A3138; }
-
-  .sym-cell { display: flex; flex-direction: column; gap: 4px; }
-  .day-chg-mini { display: flex; align-items: center; gap: 5px; }
-  .day-chg-mini .mini-track { width: 42px; height: 4px; background: #14181C; border-radius: 2px; overflow: hidden; }
-  .day-chg-mini .mini-fill { height: 100%; border-radius: 2px; }
-  .day-chg-mini .mini-fill.up { background: #3FA796; }
-  .day-chg-mini .mini-fill.down { background: #C4553D; }
-  .day-chg-mini .mini-pct { font-family: 'Inter', sans-serif; font-size: 10px; }
-  .day-chg-mini .mini-pct.up { color: #3FA796; } .day-chg-mini .mini-pct.down { color: #C4553D; }
-  button { font-family: inherit; cursor: pointer; }
-  .btn { display: flex; align-items: center; gap: 6px; background: #1D2329; border: 1px solid #2A3138; color: #EDEFF1; padding: 9px 14px; border-radius: 7px; font-size: 13px; }
-  .btn:hover { border-color: #3A424B; }
-  .btn.primary { background: #3FA796; border-color: #3FA796; color: #0D1210; font-weight: 600; }
-
-  /* Stat strip */
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #2A3138; border: 1px solid #2A3138; border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
-  .stat { background: #1A1F24; padding: 16px 18px; }
-  .stat-label { font-family: 'Inter', sans-serif; font-size: 10px; letter-spacing: .1em; color: #6B7680; text-transform: uppercase; margin-bottom: 6px; }
-  .stat-value { font-size: 20px; font-weight: 600; }
-
-  /* Import panel */
-  .panel { background: #1A1F24; border: 1px solid #2A3138; border-radius: 10px; padding: 20px; margin-bottom: 20px; display: none; }
-  .panel.show { display: block; }
-  .panel h3 { font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; margin: 0 0 4px; }
-  .panel p { font-family: 'Inter', sans-serif; font-size: 12px; color: #6B7680; margin: 0 0 14px; line-height: 1.5; }
-  .drop-zone { border: 1.5px dashed #3A424B; border-radius: 10px; padding: 32px 20px; text-align: center; font-family: 'Inter', sans-serif; font-size: 13px; color: #9BA3AB; cursor: pointer; transition: border-color .15s, background .15s; background: #14181C; }
-  .drop-zone:hover, .drop-zone.dragover { border-color: #3FA796; color: #EDEFF1; background: rgba(63,167,150,.06); }
-  .drop-zone input { display: none; }
-  .drop-zone-icon { font-size: 26px; margin-bottom: 8px; opacity: .85; }
-  .drop-zone-title { font-size: 14px; font-weight: 600; color: #EDEFF1; margin-bottom: 4px; }
-  .drop-zone-sub { font-size: 12px; color: #6B7680; }
-
-  /* Import modal */
-  .import-modal-box { max-width: 480px; }
-  .import-icon { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: rgba(63,167,150,.15); color: #3FA796; font-size: 13px; margin-right: 4px; }
-  .import-modal-desc { font-family: 'Inter', sans-serif; font-size: 12px; color: #6B7680; margin: 0 0 16px; line-height: 1.55; }
-  .import-modal-box .modal-title { font-size: 14px; }
-  .import-status { margin-top: 12px; font-family: 'Inter', sans-serif; font-size: 12px; }
-  .import-status.ok { color: #3FA796; }
-  .import-status.err { color: #C4553D; }
-  .rate-row { display: flex; gap: 20px; margin-top: 16px; flex-wrap: wrap; }
-  .rate-field { display: flex; align-items: center; gap: 8px; font-family: 'Inter', sans-serif; font-size: 12px; color: #9BA3AB; }
-  .rate-field input { width: 60px; background: #14181C; border: 1px solid #2A3138; border-radius: 5px; padding: 5px 8px; color: #EDEFF1; font-family: inherit; font-size: 12px; }
-  .rate-field input[readonly] { background: #101317; color: #6B7680; cursor: not-allowed; opacity: 0.85; }
-  .rate-field.locked { position: relative; }
-
-  .settings-box { background: #1A1F24; border: 1px solid #2A3138; border-radius: 10px; padding: 20px; margin-bottom: 20px; display: none; }
-  .settings-box.show { display: block; }
-  .settings-box input[type=text] { width: 100%; background: #14181C; border: 1px solid #2A3138; border-radius: 6px; padding: 9px 11px; color: #EDEFF1; font-size: 13px; font-family: inherit; }
-  .error-box { background: rgba(196,85,61,0.12); border: 1px solid #C4553D; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #E8998A; margin-bottom: 20px; display: none; font-family: 'Inter', sans-serif; }
-
-  /* Trade modal */
-  .modal-overlay { position: fixed; inset: 0; background: rgba(6,8,10,0.6); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
-  .modal-overlay.show { display: flex; }
-  .modal-box { background: #1A1F24; border: 1px solid #2A3138; border-radius: 12px; padding: 24px; width: 100%; max-width: 360px; font-family: 'Inter', sans-serif; }
-  .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-  .modal-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-  .modal-title .dot { width: 8px; height: 8px; border-radius: 50%; }
-  .modal-title.buy .dot { background: #3FA796; }
-  .modal-title.sell .dot { background: #C4553D; }
-  .modal-close { background: none; border: none; color: #6B7680; font-size: 18px; cursor: pointer; line-height: 1; }
-  .modal-sub { font-size: 12px; color: #6B7680; margin-bottom: 18px; }
-  .modal-field { margin-bottom: 14px; }
-  .modal-field label { display: block; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: #6B7680; margin-bottom: 6px; }
-  .modal-field input { width: 100%; background: #14181C; border: 1px solid #2A3138; border-radius: 7px; padding: 10px 12px; color: #EDEFF1; font-size: 14px; font-family: inherit; }
-  .modal-field input:focus { outline: none; border-color: #3FA796; }
-  .modal-field .hint { font-size: 11px; color: #4A5158; margin-top: 5px; }
-  .modal-total { background: #14181C; border: 1px solid #2A3138; border-radius: 8px; padding: 12px 14px; margin: 4px 0 18px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
-  .modal-total .amt { font-size: 16px; font-weight: 600; }
-  .modal-total.gain .amt.pos { color: #3FA796; } .modal-total.gain .amt.neg { color: #C4553D; }
-  .modal-error { font-size: 12px; color: #E8998A; margin: -6px 0 14px; display: none; }
-  .modal-error.show { display: block; }
-  .modal-actions { display: flex; gap: 10px; }
-  .modal-actions button { flex: 1; padding: 11px; border-radius: 7px; font-family: inherit; font-size: 13px; font-weight: 600; border: 1px solid #2A3138; background: #1D2329; color: #EDEFF1; }
-  .modal-actions .confirm-buy { background: #3FA796; border-color: #3FA796; color: #0D1210; }
-  .modal-actions .confirm-sell { background: #C4553D; border-color: #C4553D; color: #17110F; }
-
-  /* Table */
-  .table { background: #1A1F24; border: 1px solid #2A3138; border-radius: 10px; overflow: hidden; margin-bottom: 20px; overflow-x: auto; }
-  .row { display: grid; grid-template-columns: 100px 70px 90px 85px 105px 95px 75px 95px 110px 120px; padding: 12px 14px; font-size: 13px; align-items: center; border-bottom: 1px solid #20262C; white-space: nowrap; min-width: 990px; }
-  .row.head { font-family: 'Inter', sans-serif; font-size: 10px; letter-spacing: .06em; color: #6B7680; text-transform: uppercase; padding: 10px 14px; }
-  .sym { font-weight: 600; }
-  .muted { color: #9BA3AB; }
-  .faint { color: #4A5158; }
-  .remove-btn { background: none; border: none; color: #6B7680; font-size: 15px; justify-self: end; }
-  .row-actions { display: flex; gap: 6px; justify-self: end; align-items: center; }
-  .buy-btn, .sell-btn { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600; border-radius: 5px; padding: 5px 9px; border: 1px solid transparent; }
-  .buy-btn { background: rgba(63,167,150,.15); color: #3FA796; border-color: rgba(63,167,150,.3); }
-  .buy-btn:hover { background: rgba(63,167,150,.28); }
-  .sell-btn { background: rgba(196,85,61,.15); color: #C4553D; border-color: rgba(196,85,61,.3); }
-  .sell-btn:hover { background: rgba(196,85,61,.28); }
-  .empty-state { padding: 40px 20px; text-align: center; color: #6B7680; font-size: 13px; font-family: 'Inter', sans-serif; }
-  .tag { font-family: 'Inter', sans-serif; font-size: 10px; padding: 2px 7px; border-radius: 10px; display: inline-block; }
-  .tag.lt { background: rgba(63,167,150,.15); color: #3FA796; }
-  .tag.st { background: rgba(196,85,61,.15); color: #C4553D; }
-
-  /* Watchlist / Alerts / Health nav badges */
-  .alerts-badge { display: inline-block; background: #2A3138; color: #9BA3AB; font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; margin-left: 5px; vertical-align: middle; }
-  .alerts-badge.has-triggered { background: rgba(196,85,61,.25); color: #E8998A; }
-
-  /* Status pills used across Watchlist / Alerts */
-  .alert-tag { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 12px; display: inline-block; border: 1px solid transparent; }
-  .alert-tag.active { background: rgba(63,167,150,.15); color: #3FA796; border-color: rgba(63,167,150,.35); }
-  .alert-tag.triggered { background: rgba(196,85,61,.18); color: #E8998A; border-color: rgba(196,85,61,.4); }
-  .alert-tag.paused { background: #1D2329; color: #6B7680; border-color: #2A3138; }
-
-  /* Small action buttons in Watchlist/Alerts tables */
-  .alert-action-btn { background: #1D2329; border: 1px solid #2A3138; color: #EDEFF1; font-family: 'Inter', sans-serif; font-size: 11px; padding: 5px 9px; border-radius: 6px; margin-left: 4px; cursor: pointer; }
-  .alert-action-btn:hover { border-color: #3A424B; background: #20262C; }
-  .alert-action-btn.rearm { color: #3FA796; border-color: rgba(63,167,150,.35); }
-  .alert-action-btn.del { color: #E8998A; border-color: rgba(196,85,61,.35); }
-  .alert-action-btn.del:hover { background: rgba(196,85,61,.12); }
-
-  .alerts-banner-wrap { }
-
-  /* ---- Watchlist / Alerts layout (previously entirely unstyled) ---- */
-  .alerts-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; background: #1A1F24; border: 1px solid #2A3138; border-radius: 10px; padding: 16px 18px; }
-  .alert-stat-cell { display: flex; flex-direction: column; gap: 4px; }
-  .alert-stat-val { font-family: 'Inter', sans-serif; font-size: 20px; font-weight: 700; color: #EDEFF1; }
-
-  .alert-form-panel { background: #1A1F24; border: 1px solid #2A3138; border-radius: 10px; padding: 18px 20px; margin: 16px 0; }
-  .alert-form-title { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; color: #EDEFF1; margin-bottom: 14px; }
-  .alert-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; align-items: end; }
-  .alert-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-  .alert-field label { font-family: 'Inter', sans-serif; font-size: 11px; color: #8C9BA5; }
-  .alert-field input, .alert-field select { width: 100%; background: #14181C; border: 1px solid #2A3138; border-radius: 6px; padding: 9px 10px; color: #EDEFF1; font-family: inherit; font-size: 13px; box-sizing: border-box; }
-  .alert-field input:focus, .alert-field select:focus { outline: none; border-color: #3FA796; }
-  .alert-field.form-action { justify-content: flex-end; }
-  .alert-live-preview { font-family: 'Inter', sans-serif; font-size: 12px; color: #8C9BA5; min-height: 16px; }
-
-  .alerts-table-wrap { background: #1A1F24; border: 1px solid #2A3138; border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
-  .alerts-table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; }
-  .alerts-filters { display: flex; gap: 6px; flex-wrap: wrap; }
-  .alert-filter-btn { background: #1D2329; border: 1px solid #2A3138; color: #9BA3AB; font-family: 'Inter', sans-serif; font-size: 11.5px; padding: 6px 12px; border-radius: 20px; cursor: pointer; }
-  .alert-filter-btn:hover { border-color: #3A424B; color: #EDEFF1; }
-  .alert-filter-btn.active { background: #3FA796; border-color: #3FA796; color: #0D1210; font-weight: 600; }
-
-  .alerts-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-  .alerts-table th { text-align: left; font-family: 'Inter', sans-serif; font-size: 10px; letter-spacing: .06em; color: #6B7680; text-transform: uppercase; padding: 8px 10px; border-bottom: 1px solid #2A3138; white-space: nowrap; }
-  .alerts-table td { padding: 10px; border-bottom: 1px solid #20262C; vertical-align: middle; }
-  .alerts-table tbody tr:hover { background: #1D2329; }
-
-  .add-row { display: flex; gap: 8px; flex-wrap: wrap; }
-  .add-row input { background: #1A1F24; border: 1px solid #2A3138; border-radius: 6px; padding: 10px 12px; color: #EDEFF1; font-family: inherit; font-size: 13px; }
-  .add-row input::placeholder { color: #6B7680; }
-  #symbolInput { flex: 1 1 100px; } #qtyInput { width: 80px; } #costInput { width: 95px; } #dateInput { width: 140px; font-family: 'Inter', sans-serif; }
-  .add-btn { background: #3FA796; border: none; border-radius: 6px; padding: 10px 16px; color: #0D1210; font-weight: 600; font-size: 13px; }
-
-  .footer-note { font-size: 11px; color: #4A5158; margin-top: 20px; text-align: center; font-family: 'Inter', sans-serif; line-height: 1.6; }
-  .tax-note { font-size: 11px; color: #6B7680; margin-top: 8px; font-family: 'Inter', sans-serif; line-height: 1.6; }
-
-  @keyframes flashUp { 0% { background: rgba(63,167,150,.35); } 100% { background: transparent; } }
-  @keyframes flashDown { 0% { background: rgba(196,85,61,.35); } 100% { background: transparent; } }
-  .flash-up { animation: flashUp 1.2s ease-out; border-radius: 4px; }
-  .flash-down { animation: flashDown 1.2s ease-out; border-radius: 4px; }
-
-  @media (max-width: 640px) {
-    .stats { grid-template-columns: repeat(2, 1fr); }
-  }
-
-  /* Portfolio tabs */
-  .portfolio-tabs { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; font-family: 'Inter', sans-serif; }
-  .p-tab { display: flex; align-items: center; gap: 8px; background: #1A1F24; border: 1px solid #2A3138; color: #9BA3AB; padding: 7px 12px; border-radius: 7px; font-size: 12.5px; cursor: pointer; }
-  .p-tab:hover { border-color: #3A424B; color: #EDEFF1; }
-  .p-tab.active { background: #1D2329; border-color: #3FA796; color: #EDEFF1; font-weight: 600; }
-  .p-tab .p-edit, .p-tab .p-del { color: #6B7680; font-size: 12px; opacity: .8; }
-  .p-tab .p-edit:hover { color: #3FA796; } .p-tab .p-del:hover { color: #C4553D; }
-  .p-tab-add { background: none; border: 1px dashed #3A424B; color: #6B7680; padding: 7px 12px; border-radius: 7px; font-size: 12.5px; }
-  .p-tab-add:hover { border-color: #3FA796; color: #3FA796; }
-
-  /* Transactions panel */
-  .tx-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-  .tx-table th { text-align: left; font-family: 'Inter', sans-serif; font-size: 10px; letter-spacing: .06em; color: #6B7680; text-transform: uppercase; padding: 8px 8px; border-bottom: 1px solid #2A3138; }
-  .tx-table td { padding: 8px 8px; border-bottom: 1px solid #20262C; }
-  .tx-table input, .tx-table select { width: 100%; background: #14181C; border: 1px solid #2A3138; border-radius: 5px; padding: 6px 7px; color: #EDEFF1; font-family: inherit; font-size: 12px; }
-  .tx-side { font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; text-transform: uppercase; }
-  .tx-side.buy { background: rgba(63,167,150,.15); color: #3FA796; }
-  .tx-side.sell { background: rgba(196,85,61,.15); color: #C4553D; }
-  .tx-actions { display: flex; gap: 6px; white-space: nowrap; }
-  .tx-actions button { background: none; border: none; color: #6B7680; font-size: 12px; font-family: 'Inter', sans-serif; }
-  .tx-actions button:hover { color: #EDEFF1; }
-  .tx-actions .tx-save { color: #3FA796; } .tx-actions .tx-del:hover { color: #C4553D; }
-  .tx-fifo-toggle { background: none; border: none; color: #6B7680; font-family: 'Inter', sans-serif; font-size: 11px; cursor: pointer; padding: 0; text-align: left; }
-  .tx-fifo-toggle:hover { color: #9BA3AB; }
-  .tx-fifo-row td { padding: 0; border-bottom: 1px solid #20262C; }
-  .tx-fifo-detail { background: #14181C; padding: 12px 16px; font-family: 'Inter', sans-serif; font-size: 12px; }
-  .tx-fifo-detail .fifo-title { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: #6B7680; margin-bottom: 8px; }
-  .tx-fifo-match { display: grid; grid-template-columns: 90px 1fr 1fr 1fr 1fr 1fr 1fr; gap: 8px; padding: 6px 0; border-bottom: 1px dashed #20262C; align-items: center; }
-  .tx-fifo-match:last-of-type { border-bottom: none; }
-  .tx-fifo-match .m-label { color: #6B7680; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
-  .tx-fifo-total { display: grid; grid-template-columns: 90px 1fr 1fr 1fr 1fr 1fr 1fr; gap: 8px; padding: 8px 0 2px; margin-top: 4px; border-top: 1px solid #2A3138; font-weight: 600; }
-  .row-side-tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 9px; font-weight: 700; }
-  .tx-add-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
-  .tx-add-row input, .tx-add-row select { background: #14181C; border: 1px solid #2A3138; border-radius: 6px; padding: 9px 10px; color: #EDEFF1; font-family: inherit; font-size: 12.5px; }
-  .settings-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
-  .btn.danger { border-color: rgba(196,85,61,.4); color: #E8998A; }
-  .btn.danger:hover { border-color: #C4553D; }
-
-  /* Realized performance summary */
-  .perf-panel { background: #1A1F24; border: 1px solid #2A3138; border-radius: 10px; padding: 20px; margin-bottom: 20px; display: none; }
-  .perf-panel.show { display: block; }
-  .perf-panel h3 { font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; margin: 0 0 4px; }
-  .perf-panel p { font-family: 'Inter', sans-serif; font-size: 12px; color: #6B7680; margin: 0 0 14px; line-height: 1.5; }
-  .perf-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #2A3138; border: 1px solid #2A3138; border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
-  .perf-cell { background: #14181C; padding: 14px 16px; }
-  .perf-cell .stat-label { font-family: 'Inter', sans-serif; font-size: 10px; letter-spacing: .1em; color: #6B7680; text-transform: uppercase; margin-bottom: 6px; }
-  .perf-cell .stat-value { font-size: 17px; font-weight: 600; }
-  .best-worst { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px; }
-  .bw-card { background: #14181C; border: 1px solid #2A3138; border-radius: 8px; padding: 12px 14px; font-family: 'Inter', sans-serif; }
-  .bw-card .bw-label { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: #6B7680; margin-bottom: 6px; }
-  .bw-card .bw-sym { font-size: 14px; font-weight: 600; font-family: 'IBM Plex Mono', monospace; }
-  .bw-card .bw-amt { font-size: 13px; margin-top: 2px; }
-  .stock-perf-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 16px; }
-  .stock-perf-table th { text-align: left; font-family: 'Inter', sans-serif; font-size: 10px; letter-spacing: .06em; color: #6B7680; text-transform: uppercase; padding: 8px 8px; border-bottom: 1px solid #2A3138; }
-  .stock-perf-table td { padding: 8px 8px; border-bottom: 1px solid #20262C; }
-  .lot-status-tag { font-family: 'Inter', sans-serif; font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 10px; text-transform: uppercase; letter-spacing: .02em; }
-  .lot-status-tag.open { background: rgba(63,167,150,.15); color: #3FA796; }
-  .lot-status-tag.partial { background: rgba(212,163,58,.15); color: #D4A33A; }
-  .lot-status-tag.closed { background: rgba(107,118,128,.18); color: #9BA3AB; }
-  .lots-toggle { background: none; border: none; color: #6B7680; font-family: 'Inter', sans-serif; font-size: 11px; cursor: pointer; padding: 0; margin-top: 6px; text-align: left; }
-  .lots-toggle:hover { color: #9BA3AB; }
-  .lot-line { display: grid; grid-template-columns: 90px 70px 70px 70px 90px 90px 100px; gap: 8px; padding: 5px 0; font-family: 'Inter', sans-serif; font-size: 11.5px; border-bottom: 1px dashed #20262C; align-items: center; }
-  .lot-line:last-child { border-bottom: none; }
-  .lot-line .m-label { color: #6B7680; font-size: 9px; text-transform: uppercase; }
-  .reconcile-note { font-family: 'Inter', sans-serif; font-size: 11px; color: #4A5158; margin-top: 14px; padding-top: 12px; border-top: 1px dashed #2A3138; }
-  .reconcile-note.ok { color: #3FA796; }
-  .reconcile-note.bad { color: #C4553D; }
-  .fee-note { font-family: 'Inter', sans-serif; font-size: 11px; color: #4A5158; margin: -8px 0 14px; }
-
-  /* Generic app modal */
-  .app-modal-overlay { position: fixed; inset: 0; background: rgba(6,8,10,0.65); display: none; align-items: center; justify-content: center; z-index: 200; padding: 20px; }
-  .app-modal-overlay.show { display: flex; }
-  .app-modal-box { background: #1A1F24; border: 1px solid #2A3138; border-radius: 12px; padding: 22px; width: 100%; max-width: 340px; font-family: 'Inter', sans-serif; animation: modalPop .15s ease-out; }
-  @keyframes modalPop { from { opacity: 0; transform: scale(.96) translateY(4px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-  .app-modal-icon { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px; margin-bottom: 12px; }
-  .app-modal-icon.warn { background: rgba(196,85,61,.15); color: #C4553D; }
-  .app-modal-icon.ask { background: rgba(63,167,150,.15); color: #3FA796; }
-  .app-modal-icon.info { background: rgba(107,118,128,.18); color: #9BA3AB; }
-  .app-modal-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; color: #EDEFF1; }
-  .app-modal-msg { font-size: 13px; color: #9BA3AB; line-height: 1.5; margin-bottom: 16px; }
-  .app-modal-box input[type=text] { width: 100%; background: #14181C; border: 1px solid #2A3138; border-radius: 7px; padding: 10px 12px; color: #EDEFF1; font-size: 14px; font-family: inherit; margin-bottom: 16px; }
-  .app-modal-box input[type=text]:focus { outline: none; border-color: #3FA796; }
-  .app-modal-actions { display: flex; gap: 10px; }
-  .app-modal-actions button { flex: 1; padding: 11px; border-radius: 7px; font-family: inherit; font-size: 13px; font-weight: 600; border: 1px solid #2A3138; background: #1D2329; color: #EDEFF1; cursor: pointer; }
-  .app-modal-actions button:hover { border-color: #3A424B; }
-  .app-modal-actions .app-modal-ok { background: #3FA796; border-color: #3FA796; color: #0D1210; }
-  .app-modal-actions .app-modal-ok.danger { background: #C4553D; border-color: #C4553D; color: #17110F; }
-  .app-modal-actions.single button { flex: none; min-width: 120px; margin-left: auto; }
-
-  /* Login gate */
-  #loginGate { position: fixed; inset: 0; background: #0D1210; display: flex; align-items: center; justify-content: center; z-index: 500; padding: 20px; font-family: 'Inter', sans-serif; }
-  #loginGate.hide { display: none; }
-  .lg-box { width: 100%; max-width: 340px; background: #1A1F24; border: 1px solid #2A3138; border-radius: 12px; padding: 26px; }
-  .lg-title { font-size: 16px; font-weight: 600; color: #EDEFF1; margin-bottom: 4px; }
-  .lg-sub { font-size: 12.5px; color: #6B7680; margin-bottom: 18px; line-height: 1.5; }
-  .lg-box input { width: 100%; background: #14181C; border: 1px solid #2A3138; border-radius: 7px; padding: 10px 12px; color: #EDEFF1; font-size: 13.5px; font-family: inherit; margin-bottom: 10px; }
-  .lg-box input:focus { outline: none; border-color: #3FA796; }
-  .lg-row { display: flex; gap: 8px; margin-top: 4px; }
-  .lg-row button { flex: 1; padding: 11px; border-radius: 7px; font-family: inherit; font-size: 13px; font-weight: 600; border: 1px solid #2A3138; background: #1D2329; color: #EDEFF1; cursor: pointer; }
-  .lg-row button:hover { border-color: #3A424B; }
-  .lg-row .lg-primary { background: #3FA796; border-color: #3FA796; color: #0D1210; }
-  .lg-msg { font-size: 12px; color: #C4553D; margin-top: 10px; min-height: 14px; }
-  .lg-msg.ok { color: #3FA796; }
-  .lg-loading { font-size: 12.5px; color: #6B7680; }
-
-  /* Target cursor */
-  html.tc-active, html.tc-active * { cursor: none !important; }
-  #tcCursor {
-    position: fixed; top: 0; left: 0; width: 32px; height: 32px;
-    margin-left: -16px; margin-top: -16px;
-    border: 2px solid var(--tc-color, #ffffff);
-    border-radius: 8px; pointer-events: none; z-index: 9999;
-    transition: width .2s ease, height .2s ease, border-radius .2s ease,
-                border-color .2s ease, transform .05s linear, opacity .15s ease;
-    opacity: 0;
-  }
-  #tcCursor.tc-visible { opacity: 1; }
-  #tcCursor.tc-on-target { border-radius: 6px; }
-  #tcCursor::before {
-    content: ""; position: absolute; top: 50%; left: 50%;
-    width: 4px; height: 4px; margin: -2px 0 0 -2px;
-    background: var(--tc-color, #ffffff); border-radius: 50%;
-    transition: background .2s ease;
-  }
-</style>
-</head>
-<body>
-<div id="tcCursor"></div>
-<div id="loginGate">
-  <div class="lg-box">
-    <div class="lg-title">Sign in to your portfolio</div>
-    <div class="lg-sub" id="lgSub">Your holdings and transactions are private to your account.</div>
-    <div id="lgFormArea">
-      <input type="email" id="lgEmail" placeholder="Email" autocomplete="username" />
-      <input type="password" id="lgPassword" placeholder="Password" autocomplete="current-password" />
-      <div class="lg-row">
-        <button class="lg-primary" id="lgSignInBtn">Sign in</button>
-        <button id="lgSignUpBtn">Create account</button>
-      </div>
-      <div class="lg-msg" id="lgMsg"></div>
-    </div>
-    <div id="lgLoadingArea" style="display:none;" class="lg-loading">Checking your session…</div>
-  </div>
-</div>
-<div class="wrap">
-  <div class="ee-brand" style="display:flex; align-items:center; justify-content:space-between;">
-    <div style="display:flex; align-items:center; gap:10px;">
-      <div class="ee-mark">EE</div>
-      <div class="ee-brand-text"><b>Elite Elliott</b> · Portfolio</div>
-    </div>
-    <button class="btn label" id="lgSignOutBtn" style="font-size:11.5px; padding:6px 10px;">Sign out</button>
-  </div>
-  <nav class="app-nav label" id="appNav">
-    <button class="app-nav-btn" data-view="overview">Overview</button>
-    <button class="app-nav-btn" data-view="holdings">Holdings</button>
-    <button class="app-nav-btn" data-view="activity">Activity</button>
-    <button class="app-nav-btn" data-view="analysis">Analysis</button>
-    <button class="app-nav-btn" data-view="watchlist" id="watchlistNavBtn">Watchlist <span id="watchlistBadge" class="alerts-badge" style="display:none;">0</span></button>
-    <button class="app-nav-btn" data-view="health" id="healthNavBtn">Health <span id="healthBadge" class="alerts-badge" style="display:none;">0</span></button>
-    <button class="app-nav-btn" data-view="alerts" id="alertsNavBtn">Alerts <span id="alertsBadge" class="alerts-badge" style="display:none;">0</span></button>
-    <button class="app-nav-btn" data-view="settings">Settings</button>
-  </nav>
-
-  <div class="app-view" id="view-overview">
-  <div class="portfolio-tabs" id="portfolioTabs"></div>
-
-  <div class="header">
-    <div>
-      <div class="eyebrow label" id="portfolioNameLabel">NEPSE Portfolio</div>
-      <div class="total" id="totalValue">Rs 0</div>
-      <div class="pl-row" id="totalPL"></div>
-    </div>
-    <div style="display:flex; gap:14px; flex-wrap: wrap; align-items:center;">
-      <button class="btn-3d btn-3d-1" id="importBtn" title="Import from Meroshare">
-        <span class="inner">
-          <svg viewBox="0 0 24 24"><path d="M12 3l5 5h-3v7h-4V8H7l5-5zM5 19h14v2H5v-2z"/></svg>
-          <span class="label">Import</span>
-        </span>
-      </button>
-      <button class="btn-3d btn-3d-2" id="unrealBtn" title="Stock P/L">
-        <span class="inner">
-          <svg viewBox="0 0 24 24"><path d="M3 3v18h18v-2H5V3H3zm16 4l-5 5-3-3-6 6 1.5 1.5L11 11l3 3 6.5-6.5L19 7z"/></svg>
-          <span class="label">Stock P/L</span>
-        </span>
-      </button>
-      <button class="btn-3d btn-3d-3" id="perfBtn" title="Realized Performance">
-        <span class="inner">
-          <svg viewBox="0 0 24 24"><path d="M5 19h14v2H5v-2zM7 15h2v-4H7v4zm4 0h2V7h-2v8zm4 0h2v-6h-2v6z"/></svg>
-          <span class="label">Performance</span>
-        </span>
-      </button>
-      <button class="btn-3d btn-3d-4" id="refreshBtn" title="Refresh prices">
-        <span class="inner">
-          <svg viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0020 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 004 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
-          <span class="label">Refresh</span>
-        </span>
-      </button>
-      <button class="btn label" id="txBtn">🧾 Transactions</button>
-      <button class="btn label" id="divBtn">💰 Dividends</button>
-      <button class="btn label" id="sectorBtn">🧭 Sectors</button>
-      <button class="btn label" id="topPerfBtn">🏆 Top Performers</button>
-      <button class="btn label" id="settingsBtn">⚙</button>
-    </div>
-  </div>
-
-  <div class="stats">
-    <div class="stat">
-      <div class="stat-label">Total Cost Basis</div>
-      <div class="stat-value" id="statCost">Rs 0</div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">Unrealized Gain</div>
-      <div class="stat-value" id="statGain">Rs 0</div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">Est. Tax If Sold Today</div>
-      <div class="stat-value" id="statTax">Rs 0</div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">Est. Net After Tax</div>
-      <div class="stat-value" id="statNet">Rs 0</div>
-    </div>
-  </div>
-
-  <div class="stats realized-stats">
-    <div class="stat" style="grid-column: 1 / -1;">
-      <div class="stat-label">Lifetime Realized P/L (Closed Trades Only — Excludes Unrealized)</div>
-      <div class="stat-value" id="statRealized">Rs 0</div>
-    </div>
-  </div>
-  <div class="footer-note" style="margin-top:-12px; margin-bottom:20px;">
-    Realized P/L reflects gains/losses locked in from shares already sold, based on imported Trade Book history using FIFO lot matching. It does not include current holdings' unrealized gain/loss shown above. This figure is gross (before any selling charges) unless charges were entered on the sell transaction — see Realized Performance for a net breakdown where available.
-  </div>
-  </div><!-- /view-overview -->
-
-  <div class="modal-overlay import-modal-overlay" id="importModalOverlay">
-    <div class="modal-box import-modal-box">
-      <div class="modal-head">
-        <div class="modal-title" style="color:#EDEFF1;"><span class="import-icon">⇪</span><span>Import from Meroshare / Broker (TMS)</span></div>
-        <button class="modal-close" id="importModalClose">&times;</button>
-      </div>
-      <p class="import-modal-desc">
-        Drop any combination of: Meroshare <b>Share Values</b> CSV, Meroshare <b>WACC Report</b> CSV,
-        Meroshare <b>Transaction History</b> CSV, or your broker's <b>Trade Book</b> (.xlsx, from TMS) —
-        formats are auto-detected and merged by symbol. The Trade Book is the best source since it has
-        actual buy/sell prices; holdings are rebuilt from full trade history using FIFO lot matching, so
-        avg cost and holding period reflect what's actually still in your account.
-      </p>
-      <div class="drop-zone" id="dropZone">
-        <div class="drop-zone-icon">📄</div>
-        <div class="drop-zone-title">Drop file(s) here</div>
-        <div class="drop-zone-sub">or click to browse · .csv, .xlsx, .xls</div>
-        <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" multiple />
-      </div>
-      <div class="import-status" id="importStatus"></div>
-      <div class="client-picker" id="clientPicker" style="display:none; margin-top:12px;">
-        <div style="font-family:'Inter',sans-serif; font-size:12px; color:#9BA3AB; margin-bottom:8px;">
-          This trade book has multiple clients — pick one to import:
-        </div>
-        <select id="clientSelect" style="background:#14181C; border:1px solid #2A3138; border-radius:6px; padding:8px 10px; color:#EDEFF1; font-family:inherit; font-size:13px;"></select>
-        <button class="btn primary label" id="clientImportBtn" style="margin-left:8px;">Import for this client</button>
-      </div>
-      <div class="rate-row">
-        <div class="rate-field"><span>Long-term rate (%)</span><input type="number" id="ltRate" value="7.5" step="0.1" readonly disabled /></div>
-        <div class="rate-field"><span>Short-term rate (%)</span><input type="number" id="stRate" value="10" step="0.1" readonly disabled /></div>
-        <div class="rate-field"><span>Holding threshold (days)</span><input type="number" id="holdingThreshold" value="365" readonly disabled /></div>
-      </div>
-      <div class="tax-note">🔒 Tax rates and holding threshold are fixed and cannot be edited. Nepal taxes capital gains on listed shares only when sold — final tax deducted by your broker at the point of sale. These figures are illustrative "if sold today" estimates, not tax advice.</div>
-    </div>
-  </div>
-
-  <div class="app-view" id="view-activity">
-  <div class="panel" id="txPanel">
-    <h3>Transaction History</h3>
-    <p>Every buy, sell, and import that built your current holdings, for this portfolio. Fix a mistake by editing or deleting an entry below — holdings and realized P/L recalculate automatically. Selling charges are optional — enter them only if you know the actual amount from your broker; they're never estimated or assumed.</p>
-    <table class="tx-table">
-      <thead>
-        <tr><th>Date</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th><th>Cost Basis</th><th>Proceeds</th><th>Gain/Loss</th><th>Return</th><th></th></tr>
-      </thead>
-      <tbody id="txTableBody"></tbody>
-    </table>
-    <div class="tx-add-row">
-      <input type="date" id="txDateInput" title="Date" />
-      <input id="txSymbolInput" placeholder="SYMBOL" style="width:90px;" />
-      <select id="txSideInput"><option value="buy">Buy</option><option value="sell">Sell</option></select>
-      <input id="txQtyInput" type="number" placeholder="Qty" style="width:80px;" />
-      <input id="txPriceInput" type="number" placeholder="Price" style="width:90px;" />
-      <input id="txFeesInput" type="number" placeholder="Charges (optional)" style="width:140px;" />
-      <button class="add-btn label" id="txAddBtn">+ Add Transaction</button>
-    </div>
-  </div>
-
-  <div class="panel" id="divPanel">
-    <h3>Dividends</h3>
-    <p>Cash dividends received, tracked separately from your buy/sell ledger. Doesn't affect cost basis, FIFO lots, or capital gains tax — purely for total-return tracking.</p>
-    <table class="tx-table">
-      <thead>
-        <tr><th>Date</th><th>Symbol</th><th>Amount (Rs)</th><th>Note</th><th></th></tr>
-      </thead>
-      <tbody id="divTableBody"></tbody>
-    </table>
-    <div class="tx-add-row">
-      <input type="date" id="divDateInput" title="Date" />
-      <input id="divSymbolInput" placeholder="SYMBOL" style="width:90px;" />
-      <input id="divAmountInput" type="number" placeholder="Amount (Rs)" style="width:130px;" />
-      <input id="divNoteInput" placeholder="Note (optional)" style="width:160px;" />
-      <button class="add-btn label" id="divAddBtn">+ Add Dividend</button>
-    </div>
-    <div class="stat-label label" style="margin-top:14px;">Total dividends received (this portfolio): <span id="divTotal" style="color:#EDEFF1; font-weight:600;">Rs 0</span></div>
-    <div id="divBySymbolWrap"></div>
-  </div>
-
-  </div><!-- /view-activity -->
-
-  <div class="app-view" id="view-analysis">
-  <div class="panel" id="unrealPanel">
-    <h3>Unrealized P/L — By Stock</h3>
-    <p>Net profit or loss for each stock you currently hold, based on live price vs. your average cost. This is separate from Realized Performance, which only covers shares you've already sold.</p>
-    <table class="stock-perf-table">
-      <thead>
-        <tr><th>Symbol</th><th>Qty</th><th>Avg Cost</th><th>LTP</th><th>Cost Basis</th><th>Value</th><th>Net P/L</th><th>Return</th></tr>
-      </thead>
-      <tbody id="unrealBody"></tbody>
-    </table>
-  </div>
-
-  <div class="panel" id="sectorPanel">
-    <h3>Sector Breakdown</h3>
-    <p>Portfolio value split by sector, based on current holdings' market value. NEPSE is heavily sector-correlated, so concentration here matters more than in diversified markets. Unmapped symbols show as "Unclassified" — you can set their sector manually below.</p>
-    <div id="sectorBars"></div>
-    <div class="stat-label label" style="margin-top:18px;">Unmapped symbols</div>
-    <div id="sectorUnmapped" style="margin-top:8px;"></div>
-  </div>
-
-  <div class="panel" id="topPerfPanel">
-    <h3>Top Performers</h3>
-    <p>Best/worst returning stocks in this portfolio over the selected window, computed from daily price snapshots recorded from this device going forward — there's no historical price feed, so accuracy for a window builds up day by day until it's fully covered.</p>
-    <div class="tabs" style="display:flex; gap:8px; margin-bottom:14px;">
-      <button class="btn label active" data-topperf-range="1w">1 Week</button>
-      <button class="btn label" data-topperf-range="1m">1 Month</button>
-      <button class="btn label" data-topperf-range="1y">1 Year</button>
-      <button class="btn label" data-topperf-range="all">All Time</button>
-    </div>
-    <table class="stock-perf-table">
-      <thead>
-        <tr><th>#</th><th>Symbol</th><th>Return</th><th>Price then → now</th></tr>
-      </thead>
-      <tbody id="topPerfBody"></tbody>
-    </table>
-    <div class="stat-label label" id="topPerfNote" style="margin-top:12px;"></div>
-  </div>
-
-  <div class="perf-panel" id="perfPanel">
-    <h3>Realized Performance Summary</h3>
-    <p>Derived live from your transaction ledger's FIFO chain — closed positions only. Reflects gross figures unless you've entered actual selling charges on a sell transaction.</p>
-    <div class="perf-grid" id="perfGrid"></div>
-    <div class="best-worst" id="bestWorstRow"></div>
-    <div id="stockPerfWrap">
-      <div class="stat-label label" style="margin-top:10px;">By Symbol</div>
-      <table class="stock-perf-table">
-        <thead>
-          <tr><th>Symbol</th><th>Qty Sold</th><th>Cost Basis</th><th>Proceeds</th><th>Realized P/L</th><th>Return</th></tr>
-        </thead>
-        <tbody id="stockPerfBody"></tbody>
-      </table>
-    </div>
-    <div class="reconcile-note label" id="reconcileNote"></div>
-  </div>
-
-  </div><!-- /view-analysis -->
-
-  <!-- View: Watchlist Workspace (Checkpoint 09) -->
-  <div class="app-view" id="view-watchlist">
-    <!-- Watchlist Stats Strip -->
-    <div class="alerts-stats" style="margin-bottom:16px;">
-      <div class="alert-stat-cell">
-        <div class="label" style="font-size:11px; color:#6B7680;">WATCHLIST STOCKS</div>
-        <div class="alert-stat-val" id="watchStatTotal">0</div>
-      </div>
-      <div class="alert-stat-cell">
-        <div class="label" style="font-size:11px; color:#D4A33A;">NEAR TARGET (≤ 3%)</div>
-        <div class="alert-stat-val" id="watchStatNear" style="color:#D4A33A;">0</div>
-      </div>
-      <div class="alert-stat-cell">
-        <div class="label" style="font-size:11px; color:#3FA796;">TARGETS REACHED</div>
-        <div class="alert-stat-val" id="watchStatHit" style="color:#3FA796;">0</div>
-      </div>
-      <div class="alert-stat-cell">
-        <div class="label" style="font-size:11px; color:#B497CF;">TOP WATCHLIST MOVER</div>
-        <div class="alert-stat-val" id="watchStatTopMover" style="font-size:15px; color:#EDEFF1; margin-top:4px;">—</div>
-      </div>
-    </div>
-
-    <!-- Add Stock to Watchlist Card -->
-    <div class="alert-form-panel">
-      <div class="alert-form-title">
-        <span>Add Stock to Watchlist</span>
-        <span class="muted label" style="font-size:11px; font-weight:normal;">Track prospective NEPSE entries, proximity to price targets & 1-click execution</span>
-      </div>
-      <div class="alert-form-grid">
-        <div class="alert-field">
-          <label>Symbol</label>
-          <input type="text" id="watchSymbolInput" placeholder="e.g. NABIL" style="text-transform:uppercase;" />
-        </div>
-        <div class="alert-field">
-          <label>Target Price (Rs)</label>
-          <input type="number" id="watchTargetPriceInput" step="any" placeholder="e.g. 510" />
-          <div style="display:flex; gap:4px; margin-top:4px;">
-            <button type="button" class="btn label watch-quick-pct" data-pct="-10" style="font-size:10px; padding:2px 6px; background:#1C2227;">-10%</button>
-            <button type="button" class="btn label watch-quick-pct" data-pct="-5" style="font-size:10px; padding:2px 6px; background:#1C2227;">-5%</button>
-            <button type="button" class="btn label watch-quick-pct" data-pct="5" style="font-size:10px; padding:2px 6px; background:#1C2227;">+5%</button>
-            <button type="button" class="btn label watch-quick-pct" data-pct="10" style="font-size:10px; padding:2px 6px; background:#1C2227;">+10%</button>
-          </div>
-        </div>
-        <div class="alert-field">
-          <label>Target Type / Rule</label>
-          <select id="watchTargetTypeSelect">
-            <option value="buy_below">Buy Target (Alert / buy when LTP ≤ Target)</option>
-            <option value="sell_above">Sell Target (Alert / sell when LTP ≥ Target)</option>
-            <option value="track_only">Track Only (No target threshold)</option>
-          </select>
-        </div>
-        <div class="alert-field">
-          <label>Strategy / Notes (Optional)</label>
-          <input type="text" id="watchNoteInput" placeholder="e.g. Support near 500, wait for volume" />
-        </div>
-        <div class="alert-field form-action">
-          <label>&nbsp;</label>
-          <button class="btn btn-3d label" id="addWatchlistBtn" style="background:#3FA796; color:#0A1210; font-weight:700; border:none; padding:9px 16px;">+ Add to Watchlist</button>
-        </div>
-      </div>
-      <div class="alert-live-preview" id="watchLivePreview" style="margin-top:10px; font-size:12px; color:#8C9BA5;"></div>
-    </div>
-
-    <!-- Watchlist Table & Filter Bar -->
-    <div class="alerts-table-wrap">
-      <div class="alerts-table-header" style="flex-wrap:wrap; gap:10px;">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <div style="font-weight:600; color:#EDEFF1; font-size:14px;">Monitored Stocks</div>
-          <input type="text" id="watchSearchInput" placeholder="Search symbol or note…" style="background:#14181C; border:1px solid #2A3138; border-radius:6px; padding:4px 10px; font-size:12px; color:#EDEFF1; width:180px;" />
-        </div>
-        <div class="alerts-filters" style="display:flex; gap:6px; flex-wrap:wrap;">
-          <button class="alert-filter-btn active" data-watch-filter="all">All</button>
-          <button class="alert-filter-btn" data-watch-filter="near">Near Target (≤3%)</button>
-          <button class="alert-filter-btn" data-watch-filter="hit">Target Reached</button>
-          <button class="alert-filter-btn" data-watch-filter="gainers">Gainers Today</button>
-          <button class="alert-filter-btn" data-watch-filter="losers">Losers Today</button>
-        </div>
-      </div>
-      <div style="overflow-x:auto;">
-        <table class="alerts-table watchlist-table">
-          <thead>
-            <tr>
-              <th>Symbol & Sector</th>
-              <th>Live LTP</th>
-              <th>Today's Change</th>
-              <th>Target & Rule</th>
-              <th>Distance & Progress</th>
-              <th>Notes</th>
-              <th>Status</th>
-              <th style="text-align:right;">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="watchlistTableBody">
-            <!-- Dynamically populated -->
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="muted label" style="font-size:11px; margin-top:14px; text-align:center; color:#525E68;">
-      ℹ Watchlist items are saved securely to your authenticated account and updated on every live NEPSE 30-second price refresh.
-    </div>
-  </div><!-- /view-watchlist -->
-
-  <!-- Health: Data integrity checks + Portfolio diversification/concentration -->
-  <div class="app-view" id="view-health">
-    <div class="panel show" id="healthPanel">
-      <div class="panel-head">
-        <div class="panel-title">🩺 Data Health</div>
-        <button class="btn label" id="healthRefreshBtn">↻ Re-check</button>
-      </div>
-      <div class="stats" style="margin-bottom:14px;">
-        <div class="stat">
-          <div class="stat-label">Total Issues</div>
-          <div class="stat-value" id="healthStatTotal">0</div>
-        </div>
-        <div class="stat">
-          <div class="stat-label">Need Attention</div>
-          <div class="stat-value down" id="healthStatWarn">0</div>
-        </div>
-        <div class="stat">
-          <div class="stat-label">Informational</div>
-          <div class="stat-value" id="healthStatInfo">0</div>
-        </div>
-      </div>
-      <div class="reconcile-note ok" id="healthSummary" style="margin-bottom:14px;">Checking…</div>
-      <div id="healthIssuesList"></div>
-    </div>
-
-    <div class="panel show" id="porthealthPanel" style="margin-top:20px;">
-      <div class="panel-head">
-        <div class="panel-title">📊 Portfolio Health</div>
-        <button class="btn label" id="porthealthRefreshBtn">↻ Re-check</button>
-      </div>
-      <div id="porthealthBody"></div>
-    </div>
-  </div><!-- /view-health -->
-
-  <!-- View: Alerts Workspace (Checkpoint 08) -->
-  <div class="app-view" id="view-alerts">
-    <!-- Active Triggered Alerts Banner -->
-    <div id="alertsActiveBanner" class="alerts-banner-wrap" style="display:none;"></div>
-
-    <!-- Alerts Stats Strip -->
-    <div class="alerts-stats">
-      <div class="alert-stat-cell">
-        <div class="label" style="font-size:11px; color:#6B7680;">TOTAL ALERTS</div>
-        <div class="alert-stat-val" id="alertStatTotal">0</div>
-      </div>
-      <div class="alert-stat-cell">
-        <div class="label" style="font-size:11px; color:#3FA796;">ACTIVE (MONITORING)</div>
-        <div class="alert-stat-val" id="alertStatActive" style="color:#3FA796;">0</div>
-      </div>
-      <div class="alert-stat-cell">
-        <div class="label" style="font-size:11px; color:#FF7B60;">TRIGGERED</div>
-        <div class="alert-stat-val" id="alertStatTriggered" style="color:#FF7B60;">0</div>
-      </div>
-      <div class="alert-stat-cell">
-        <div class="label" style="font-size:11px; color:#6B7680;">PAUSED</div>
-        <div class="alert-stat-val" id="alertStatPaused" style="color:#8C9BA5;">0</div>
-      </div>
-    </div>
-
-    <!-- Create Alert Card -->
-    <div class="alert-form-panel">
-      <div class="alert-form-title">
-        <span>Create Price or Portfolio Alert</span>
-        <span class="muted label" style="font-size:11px; font-weight:normal;">Evaluated in real-time on every 30s price sync</span>
-      </div>
-      <div class="alert-form-grid">
-        <div class="alert-field">
-          <label>Alert Type</label>
-          <select id="alertTypeSelect">
-            <option value="price_target">Stock Price Target</option>
-            <option value="price_pct_up">Stock Intraday Gain (% ≥)</option>
-            <option value="price_pct_down">Stock Intraday Drop (% ≤)</option>
-            <option value="portfolio_val">Portfolio Total Value</option>
-            <option value="portfolio_day_pl">Portfolio Day's P/L</option>
-          </select>
-        </div>
-        <div class="alert-field" id="alertSymbolField">
-          <label>Stock Symbol</label>
-          <input type="text" id="alertSymbolInput" placeholder="e.g. NABIL" list="alertSymbolsDatalist" style="text-transform:uppercase;" />
-          <datalist id="alertSymbolsDatalist"></datalist>
-        </div>
-        <div class="alert-field" id="alertConditionField">
-          <label>Condition</label>
-          <select id="alertConditionSelect">
-            <option value="gte">≥ (At or above)</option>
-            <option value="lte">≤ (At or below)</option>
-          </select>
-        </div>
-        <div class="alert-field">
-          <label id="alertThresholdLabel">Target Price (Rs)</label>
-          <input type="number" id="alertThresholdInput" step="any" placeholder="e.g. 800" />
-        </div>
-        <div class="alert-field">
-          <label>Note / Reminder (Optional)</label>
-          <input type="text" id="alertNoteInput" placeholder="e.g. Profit target, stop loss" />
-        </div>
-        <div class="alert-field form-action">
-          <label>&nbsp;</label>
-          <button class="btn btn-3d label" id="createAlertBtn" style="background:#3FA796; color:#0A1210; font-weight:700; border:none; padding:9px 16px;">+ Set Alert</button>
-        </div>
-      </div>
-      <div class="alert-live-preview" id="alertLivePreview"></div>
-    </div>
-
-    <!-- Alerts Table & Filters -->
-    <div class="alerts-table-wrap">
-      <div class="alerts-table-header">
-        <div style="font-weight:600; color:#EDEFF1; font-size:14px;">Configured Alerts</div>
-        <div class="alerts-filters">
-          <button class="alert-filter-btn active" data-filter="all">All</button>
-          <button class="alert-filter-btn" data-filter="active">Active</button>
-          <button class="alert-filter-btn" data-filter="triggered">Triggered</button>
-          <button class="alert-filter-btn" data-filter="paused">Paused</button>
-        </div>
-      </div>
-      <div style="overflow-x:auto;">
-        <table class="alerts-table">
-          <thead>
-            <tr>
-              <th>Status</th>
-              <th>Type & Symbol</th>
-              <th>Condition & Target</th>
-              <th>Current Live Value</th>
-              <th>Note</th>
-              <th>Last Checked / Triggered</th>
-              <th style="text-align:right;">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="alertsTableBody">
-            <!-- Dynamically populated -->
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="muted label" style="font-size:11px; margin-top:14px; text-align:center; color:#525E68;">
-      ℹ Alerts run client-side against the live NEPSE price feed whenever the dashboard is open. Saved securely to your authenticated account.
-    </div>
-  </div><!-- /view-alerts -->
-
-  <div class="app-view" id="view-settings">
-  <div class="settings-box" id="settingsBox">
-    <div class="label" style="font-size:12px; color:#6B7680; margin-bottom:8px;">CURRENT PORTFOLIO</div>
-    <input type="text" id="renamePortfolioInput" placeholder="Portfolio name" />
-    <div class="settings-actions">
-      <button class="btn label" id="renamePortfolioBtn">Rename</button>
-      <button class="btn danger label" id="clearPortfolioBtn">🗑 Clear This Portfolio's Data</button>
-      <button class="btn danger label" id="deletePortfolioBtn">✕ Delete This Portfolio</button>
-    </div>
-    <div class="label" style="font-size:12px; color:#6B7680; margin:16px 0 8px;">BACKUP</div>
-    <div class="settings-actions">
-      <button class="btn label" id="exportAllBtn">⬇ Export All Portfolios (.json)</button>
-      <label class="btn label" for="importBackupInput" style="display:inline-flex;">⬆ Restore from Backup</label>
-      <input type="file" id="importBackupInput" accept="application/json" style="display:none;" />
-    </div>
-
-    <div class="label" style="font-size:12px; color:#6B7680; margin:20px 0 8px;">SECURITY & ACCOUNT ISOLATION AUDIT</div>
-    <div class="sec-audit-card" id="secAuditCard" style="background:#14181C; border:1px solid #2A3138; border-radius:8px; padding:14px 16px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #1F252B; font-size:12px;">
-        <span style="color:#8C9BA5;">Authenticated Account UID:</span>
-        <span id="secAuditUid" style="color:#EDEFF1; font-family:monospace; font-size:11.5px;">—</span>
-      </div>
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #1F252B; font-size:12px;">
-        <span style="color:#8C9BA5;">Multi-Tenant Data Isolation:</span>
-        <span style="color:#3FA796; font-weight:600;">✓ Active (Supabase RLS & user_id bound)</span>
-      </div>
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #1F252B; font-size:12px;">
-        <span style="color:#8C9BA5;">Client Secrets Exposure:</span>
-        <span style="color:#3FA796; font-weight:600;">✓ Clean (Zero service-role keys exposed)</span>
-      </div>
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; font-size:12px;">
-        <span style="color:#8C9BA5;">Memory & Cache Scrubbing:</span>
-        <span style="color:#3FA796; font-weight:600;">✓ Enforced (Zeroed on logout / account switch)</span>
-      </div>
-      <div style="margin-top:12px; display:flex; align-items:center; gap:10px;">
-        <button class="btn label" id="secAuditTestBtn" style="font-size:11.5px; padding:6px 12px;">Run Isolation Self-Test</button>
-        <span id="secAuditResult" style="font-size:11.5px; color:#8C9BA5;"></span>
-      </div>
-    </div>
-  </div>
-
-  </div><!-- /view-settings -->
-
-  <div class="error-box" id="errorBox">Couldn't reach the price feed. Check the Worker URL in settings.</div>
-
-  <div class="app-modal-overlay" id="appModalOverlay">
-    <div class="app-modal-box">
-      <div class="app-modal-icon" id="appModalIcon">!</div>
-      <div class="app-modal-title" id="appModalTitle">Title</div>
-      <div class="app-modal-msg" id="appModalMsg">Message</div>
-      <input type="text" id="appModalInput" style="display:none;" />
-      <div class="app-modal-actions" id="appModalActions">
-        <button id="appModalCancel">Cancel</button>
-        <button id="appModalOk" class="app-modal-ok">OK</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="tradeModalOverlay">
-    <div class="modal-box">
-      <div class="modal-head">
-        <div class="modal-title" id="tradeModalTitle"><span class="dot"></span><span id="tradeModalTitleText">Buy</span></div>
-        <button class="modal-close" id="tradeModalClose">&times;</button>
-      </div>
-      <div class="modal-sub" id="tradeModalSub"></div>
-
-      <div class="modal-field">
-        <label>Quantity</label>
-        <input type="number" id="tradeQty" min="1" step="1" placeholder="0" />
-        <div class="hint" id="tradeQtyHint"></div>
-      </div>
-      <div class="modal-field">
-        <label>Price per share (Rs)</label>
-        <input type="number" id="tradePrice" min="0" step="0.01" placeholder="0.00" />
-      </div>
-      <div class="modal-field" id="tradeFeesField">
-        <label>Selling charges (Rs) <span style="text-transform:none; opacity:.7;">(optional, actual amount only)</span></label>
-        <input type="number" id="tradeFees" min="0" step="0.01" placeholder="0.00" />
-      </div>
-      <div class="modal-field" id="tradeDateField">
-        <label>Purchase date <span style="text-transform:none; opacity:.7;">(optional)</span></label>
-        <input type="date" id="tradeDate" />
-      </div>
-
-      <div class="modal-total" id="tradeTotalBox">
-        <span id="tradeTotalLabel">Total cost</span>
-        <span class="amt" id="tradeTotalAmt">Rs 0</span>
-      </div>
-
-      <div class="modal-error" id="tradeError"></div>
-
-      <div class="modal-actions">
-        <button id="tradeCancelBtn">Cancel</button>
-        <button id="tradeConfirmBtn" class="confirm-buy">Confirm Buy</button>
-      </div>
-    </div>
-  </div>
-
-
-  <div class="app-view" id="view-holdings">
-  <div class="day-pl-strip" id="dayPlStrip" style="display:none;">
-    <div class="label-col">
-      <div class="stat-label">Today's Gain / Loss</div>
-      <div class="amt-row">
-        <span class="amt" id="dayPlAmt">Rs 0</span>
-        <span class="pct" id="dayPlPct"></span>
-      </div>
-    </div>
-    <div class="day-pl-bar-track">
-      <div class="mid-line"></div>
-      <div class="day-pl-bar-fill" id="dayPlBarFill"></div>
-    </div>
-  </div>
-
-  <div class="table">
-    <div class="row head">
-      <span>Symbol</span><span>Qty</span><span>Avg Cost</span><span>LTP</span><span>Value</span><span>P/L (Rs / %)</span><span>Term</span><span>Est. Tax</span><span>Purchased</span><span></span>
-    </div>
-    <div id="holdingsList"></div>
-  </div>
-
-  <div class="add-row">
-    <input id="symbolInput" placeholder="SYMBOL" />
-    <input id="qtyInput" type="number" placeholder="Qty" />
-    <input id="costInput" type="number" placeholder="Avg cost" />
-    <input id="dateInput" type="date" title="Purchase date (optional, for tax)" />
-    <button class="add-btn label" id="addBtn">+ Add</button>
-  </div>
-  </div><!-- /view-holdings -->
-
-  <div class="footer-note">
-    Last updated: <span id="lastUpdated">—</span><br/>
-    Prices from an unofficial live feed — verify before making trading decisions. Tax estimates use current Nepal CGT rates as of the FY 2026/27 budget; rates can change, adjust above if needed.
-  </div>
-</div>
-<script src="js/portfolio/auth.js"></script>
-<script src="js/portfolio/state.js"></script>
-<script src="js/portfolio/import.js"></script>
-<script src="js/portfolio/modals.js"></script>
-<script src="js/portfolio/dashboard.js"></script>
-<script src="js/portfolio/transactions.js"></script>
-<script src="js/portfolio/dividends.js"></script>
-<script src="js/portfolio/sectors.js"></script>
-<script src="js/portfolio/analysis.js"></script>
-<script src="js/portfolio/top-performers.js"></script>
-<script src="js/portfolio/watchlist.js"></script>
-<script src="js/portfolio/health.js"></script>
-<script src="js/portfolio/portfolio-health.js"></script>
-<script src="js/portfolio/alerts.js"></script>
-<script src="js/portfolio/security-audit.js"></script>
-<script src="js/portfolio/app.js"></script>
-</body>
-</html>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#111827;--mut:#6b7280;--line:#e5e7eb;--gold:#8a6a12;--goldbg:#fbf3dc;--up:#047857;--dn:#b91c1c;--blue:#2563eb;--grn:#16a34a}
+@media(prefers-color-scheme:dark){:root{--bg:#0b0e11;--card:#14181c;--ink:#edeff1;--mut:#9ba3ab;--line:#2a3138;--gold:#e0b84a;--goldbg:#2a2412;--up:#34d399;--dn:#f87171}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 Inter,system-ui,sans-serif}
+.up{color:var(--up)}.dn{color:var(--dn)}.mut{color:var(--mut)}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.logo{font-weight:800;font-size:18px}.logo small{display:block;font:600 9px monospace;letter-spacing:.12em;color:var(--mut)}
+select,input,button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+button{cursor:pointer;font-weight:600}.gold{background:var(--goldbg);color:var(--gold);border-color:var(--gold)}.solid{background:var(--gold);color:#fff;border-color:var(--gold)}
+.sp{flex:1}main{max-width:1280px;margin:auto;padding:16px}
+.kp{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:10px}
+.k{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:default}.k.click{cursor:pointer}.k.click:hover{border-color:var(--gold)}
+.k b{display:block;font:700 10px monospace;letter-spacing:.1em;color:var(--mut);text-transform:uppercase}.k .v{font-size:22px;font-weight:700;margin:4px 0 2px}.k.s .v{font-size:17px}.k small{color:var(--mut)}
+.pill{font-size:11px;padding:1px 7px;border-radius:99px;background:var(--bg);margin-right:4px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:14px 0}
+.panel h2{margin:0 0 2px;font-size:20px}.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse;white-space:nowrap}
+th{font-size:12px;text-align:right;padding:9px 10px;border-bottom:2px solid var(--ink);cursor:pointer}td{padding:9px 10px;text-align:right;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child,th.l,td.l{text-align:left}tfoot td{font-weight:700;background:var(--bg)}
+.sym{font-weight:700;border-left:4px solid var(--blue);padding-left:8px;text-align:left}.sym small{display:block;font-weight:400;color:var(--mut)}
+.menu{position:absolute;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px #0003;z-index:20;min-width:190px;padding:4px}
+.menu div{padding:9px 12px;cursor:pointer;font-weight:600;border-radius:6px}.menu div:hover{background:var(--bg)}
+.ov{position:fixed;inset:0;background:#0007;display:flex;align-items:flex-start;justify-content:center;padding:4vh 10px;z-index:30;overflow:auto}
+.md{background:var(--card);border-radius:14px;width:min(1000px,100%);padding:18px}.md h3{margin:0}
+.g{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}.g .k .v{font-size:15px}
+.tabs{display:flex;gap:16px;border-bottom:1px solid var(--line);margin:12px 0}.tabs span{padding:8px 2px;cursor:pointer;font-weight:600;color:var(--mut)}.tabs .on{color:var(--gold);border-bottom:2px solid var(--gold)}
+.two{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}.r{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)}.r.t{font-weight:700}
+form.f{display:grid;gap:10px;grid-template-columns:1fr 1fr}form.f label{font-size:12px;color:var(--mut);display:block}form.f input,form.f select{width:100%}
+#gate{max-width:340px;margin:12vh auto;display:grid;gap:10px}#gate input{width:100%}
+.charts{display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-around}
+</style></head><body>
+<div id="gate" hidden><h2>Portfolio Pro</h2><input id="em" type="email" placeholder="Email"><input id="pw" type="password" placeholder="Password"><button class="solid" id="login">Sign in</button><div id="gm" class="mut"></div></div>
+<div id="app" hidden>
+<header><div class="logo">PORTFOLIO<small>NEPSE · WACC ACCOUNTING</small></div>
+<select id="pf"></select><button class="gold" id="addTx">＋ Buy / Sell Entry</button>
+<span class="sp"></span><select id="per"><option value="1">1M</option><option value="3">3M</option><option value="6">6M</option><option value="12">1Y</option><option value="0" selected>All</option></select>
+<span class="mut" id="stat"></span><button id="out">Sign out</button></header>
+<main>
+<div class="kp" id="k1"></div><div class="kp" id="k2"></div>
+<div class="panel"><div class="bar"><div><h2>Holdings</h2><span class="mut" id="pname"></span></div><select id="fs"></select><select id="fc"></select><button id="clr">✕ Clear</button></div>
+<div class="tw"><table><thead id="hh"></thead><tbody id="hb"></tbody><tfoot id="hf"></tfoot></table></div></div>
+<div class="panel"><h2>Sector allocation</h2><div class="tw"><table><thead><tr><th class="l">Sector</th><th>Holdings</th><th>Kitta</th><th>Investment</th><th>Market Value</th><th>Unrealized P/L</th><th>Allocation</th></tr></thead><tbody id="sb"></tbody><tfoot id="sf"></tfoot></table></div><div class="charts" id="ch"></div></div>
+</main></div><div id="mod"></div>
+<script>
+const WORKER="https://shiny-term-f599.bharatiaashish43.workers.dev";
+const sb=supabase.createClient("https://bfuatuhoosiwaugcxhjt.supabase.co","eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJmdWF0dWhvb3Npd2F1Z2N4aGp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyNzIxNTksImV4cCI6MjEwMTg0ODE1OX0.0eGEG6MDysnAx8P08xdf9hQxzBTl1erQRNxFOh4ZQDI");
+const $=id=>document.getElementById(id);
+let uid=null,PF=[],cur=null,board={},sortK="mv",sortD=-1,menuEl=null;
+const CFG={st:.075,lt:.05,sebon:.00015,dp:25,minComm:10};
+const R=(n,d=0)=>(n==null||isNaN(n))?"—":Number(n).toLocaleString("en-IN",{minimumFractionDigits:d,maximumFractionDigits:d});
+const S=(n,d=0)=>(n>0?"+":"")+R(n,d),C=n=>n>0?"up":n<0?"dn":"",esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const newId=()=>Date.now()+Math.random().toString(36).slice(2,8);
+/* ---- NEPSE charges (verified against Chukul rows) ---- */
+function commRate(v){return v<=5e4?.0036:v<=5e5?.0033:v<=2e6?.0031:v<=1e7?.0027:.0024}
+const comm=v=>Math.max(CFG.minComm,v*commRate(v));
+const sellNet=v=>v-comm(v)-v*CFG.sebon-CFG.dp;
+const sellChg=v=>comm(v)+v*CFG.sebon+CFG.dp;
+function breakEven(cost,q){if(!q)return null;let lo=0,hi=cost/q*2+10;for(let i=0;i<60;i++){const m=(lo+hi)/2;sellNet(m*q)>=cost?hi=m:lo=m}return hi}
+/* ---- WACC engine ---- */
+function build(trs,from){
+ const H={},ev=[],T={};const L=[...trs].filter(t=>t.symbol&&t.qty>0).sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+ const seen={};
+ L.forEach(t=>{const s=t.symbol.toUpperCase(),h=H[s]=H[s]||{s,q:0,c:0,bought:0,boughtQ:0,sold:0,soldQ:0,bonusQ:0,chgB:0,chgS:0,cgt:0,pbt:0,div:0,first:t.date};
+ const side=String(t.side).startsWith("b")?"buy":"sell",gross=t.qty*t.price,k=s+"|"+t.date+"|"+side,dpOnce=!seen[k];seen[k]=1;
+ let chg=t.fees!=null&&t.fees!==""&&!t.auto?Number(t.fees):comm(gross)+gross*CFG.sebon+(dpOnce?CFG.dp:0);
+ const row={...t,side,gross,chg,sym:s};(T[s]=T[s]||[]).push(row);
+ if(side==="buy"){const bonus=t.price===0;h.q+=t.qty;h.c+=gross+(bonus?0:chg);if(bonus)h.bonusQ+=t.qty;else{h.bought+=gross;h.boughtQ+=t.qty;h.chgB+=chg}row.cum=h.c;row.held=h.q;row.wacc=h.q?h.c/h.q:0;if(!h.q0)h.first=h.first||t.date}
+ else{const w=h.q?h.c/h.q:0,rm=Math.min(t.qty,h.q)*w,pbt=gross-chg-rm;
+  const days=h.first&&t.date?(new Date(t.date)-new Date(h.first))/864e5:0,cgt=pbt>0?pbt*(days>365?CFG.lt:CFG.st):0;
+  h.q-=t.qty;h.c-=rm;h.sold+=gross;h.soldQ+=t.qty;h.chgS+=chg;h.cgt+=cgt;h.pbt+=pbt;if(h.q<=0){h.q=0;h.c=0;h.first=null}
+  Object.assign(row,{rm,pbt,cgt,net:pbt-cgt,cum:h.c,held:h.q,wacc:h.q?h.c/h.q:w});ev.push({date:t.date,s,pbt,cgt,net:pbt-cgt,chg,qty:t.qty})}});
+ return{H,ev,T}}
+function cur$(){return PF.find(p=>p.id===cur)||PF[0]}
+function inRange(d){const m=+$("per").value;if(!m)return true;const x=new Date();x.setMonth(x.getMonth()-m);return (d||"")>=x.toISOString().slice(0,10)}
+function calc(){
+ const p=cur$(),{H,ev,T}=build(p.transactions||[]);
+ const rows=Object.values(H).filter(h=>h.q>0).map(h=>{const b=board[h.s]||{},ltp=+b.ltp||null,pct=+b.percentChange||0,mv=ltp?ltp*h.q:null,pv=mv==null?null:mv-sellChg(mv),prev=ltp?ltp/(1+pct/100):null,day=ltp?(ltp-prev)*h.q:0;
+  return{...h,name:b.name,sector:b.sector||"Unclassified",ltp,pct,chg:ltp?ltp-prev:0,mv,pv,day,inv:h.c,wacc:h.c/h.q,be:breakEven(h.c,h.q),upl:pv==null?null:pv-h.c}});
+ const E=ev.filter(e=>inRange(e.date)),wins=E.filter(e=>e.net>0),loss=E.filter(e=>e.net<0);
+ const divs=(p.dividends||[]).filter(d=>inRange(d.date)).reduce((s,d)=>s+(+d.amount||0),0);
+ const sum=k=>rows.reduce((s,r)=>s+(r[k]||0),0),inv=sum("inv"),mv=sum("mv"),pv=sum("pv"),upl=pv-inv,day=sum("day");
+ const rp=wins.reduce((s,e)=>s+e.net,0),rl=loss.reduce((s,e)=>s+e.net,0),nr=rp+rl;
+ return{rows,H,T,ev:E,inv,mv,pv,upl,day,rp,rl,nr,nw:wins.length,nl:loss.length,divs,total:upl+nr,overall:upl+nr+divs,cgt:E.reduce((s,e)=>s+e.cgt,0),comm:E.reduce((s,e)=>s+e.chg,0)}}
+/* ---- render ---- */
+function render(){
+ if(!cur$())return;const d=calc();window.D=d;
+ const kc=(t,v,sub,cls="",extra="",on="")=>`<div class="k ${extra}" ${on}><b>${t}</b><div class="v ${cls}">${v}</div><small>${sub}</small></div>`;
+ const pp=(a,b)=>b?a/b*100:0;
+ $("k1").innerHTML=kc("Market value","Rs "+R(d.mv),`<span class="pill ${C(d.mv-d.inv)}">${S(pp(d.mv-d.inv,d.inv),2)}%</span>vs. investment`)+kc("Investment","Rs "+R(d.inv),d.rows.length+" active holdings")+
+  kc("Today's P/L","Rs "+S(d.day),`<span class="pill ${C(d.day)}">${S(pp(d.day,d.mv-d.day),2)}%</span>today`,C(d.day))+kc("Total P/L","Rs "+S(d.total),`<span class="pill ${C(d.total)}">${S(pp(d.total,d.inv),2)}%</span>total return`,C(d.total));
+ $("k1").querySelector(".k").style.borderColor="var(--gold)";
+ $("k2").innerHTML=kc("Unrealized P/L","Rs "+S(d.upl),S(pp(d.upl,d.inv),2)+"% paper",C(d.upl),"s")+
+  kc("Realized profit","Rs "+R(d.rp),d.nw+" winning trades","up","s click",`onclick="realized('profit')"`)+kc("Realized loss","Rs "+R(d.rl),d.nl+" losing trades","dn","s click",`onclick="realized('loss')"`)+
+  kc("Net realized P/L","Rs "+S(d.nr),S(pp(d.nr,d.inv),2)+"% of investment",C(d.nr),"s click",`onclick="realized('net')"`)+kc("Overall P/L","Rs "+S(d.overall),S(pp(d.overall,d.inv),2)+"% incl. dividends",C(d.overall),"s");
+ // holdings
+ const fs=$("fs").value,fc=$("fc").value;
+ const cols=[["sn","SN"],["act","Action"],["s","Symbol"],["q","Qty"],["wacc","WACC"],["inv","Investment"],["be","Break-even"],["ltp","LTP"],["mv","Market Value"],["pv","Portfolio Value"],["day","Daily P/L"],["upl","Unrealized P/L"]];
+ $("hh").innerHTML="<tr>"+cols.map(c=>`<th class="${c[0]=="s"?"l":""}" onclick="srt('${c[0]}')">${c[1]}${sortK==c[0]?(sortD>0?" ▲":" ▼"):""}</th>`).join("")+"</tr>";
+ let rows=d.rows.filter(r=>(!fs||r.s===fs)&&(!fc||r.sector===fc));
+ if(!["sn","act"].includes(sortK))rows.sort((a,b)=>sortK=="s"?sortD*a.s.localeCompare(b.s):sortD*((a[sortK]??-1e18)-(b[sortK]??-1e18)));
+ const colr=s=>"hsl("+([...s].reduce((a,c)=>a*31+c.charCodeAt(0),7)%360)+" 65% 45%)";
+ $("hb").innerHTML=rows.length?rows.map((r,i)=>`<tr><td class="l mut">${i+1}</td><td><button onclick="menu(event,'${r.s}')" style="border:0;padding:2px 8px">⋮</button></td>
+ <td class="sym" style="border-color:${colr(r.sector)};cursor:pointer" onclick="detail('${r.s}')">${r.s}<small>${esc(r.sector)}</small></td><td>${R(r.q)}</td><td>${R(r.wacc,2)}</td><td>${R(r.inv)}</td><td class="dn"><b>${R(r.be,2)}</b></td>
+ <td>${R(r.ltp,2)}<br><small class="${C(r.chg)}">${S(r.chg,2)} (${S(r.pct,2)}%)</small></td><td>${R(r.mv)}</td><td>${R(r.pv)}<br><small class="mut">${R(r.pv-r.mv)} chg</small></td>
+ <td class="${C(r.day)}"><b>${S(r.day)}</b><br><small>${S(r.pct,2)}%</small></td><td class="${C(r.upl)}"><b>${S(r.upl)}</b><br><small>${S(pp(r.upl,r.inv),2)}%</small></td></tr>`).join(""):`<tr><td colspan="12" class="mut" style="text-align:center;padding:30px">No holdings yet — use “Buy / Sell Entry”.</td></tr>`;
+ $("hf").innerHTML=`<tr><td class="l" colspan="3">Total (${rows.length})</td><td>${R(rows.reduce((s,r)=>s+r.q,0))}</td><td></td><td>${R(d.inv)}</td><td></td><td></td><td>${R(d.mv)}</td><td>${R(d.pv)}</td><td class="${C(d.day)}">${S(d.day)}</td><td class="${C(d.upl)}">${S(d.upl)}</td></tr>`;
+ $("pname").textContent=cur$().name;
+ // filters
+ const syms=[...new Set(d.rows.map(r=>r.s))].sort(),secs=[...new Set(d.rows.map(r=>r.sector))].sort();
+ $("fs").innerHTML=`<option value="">Symbol: All</option>`+syms.map(s=>`<option ${s==fs?"selected":""}>${s}</option>`).join("");
+ $("fc").innerHTML=`<option value="">Sector: All</option>`+secs.map(s=>`<option ${s==fc?"selected":""}>${esc(s)}</option>`).join("");
+ // sectors
+ const G={};d.rows.forEach(r=>{const g=G[r.sector]=G[r.sector]||{n:0,q:0,inv:0,mv:0,upl:0};g.n++;g.q+=r.q;g.inv+=r.inv;g.mv+=r.mv||0;g.upl+=r.upl||0});
+ const gs=Object.entries(G).sort((a,b)=>b[1].mv-a[1].mv),pal=["#2563eb","#16a34a","#d97706","#7c3aed","#db2777","#0891b2","#65a30d","#dc2626"];
+ $("sb").innerHTML=gs.map(([k,g],i)=>`<tr><td class="l"><span style="color:${pal[i%8]}">●</span> ${esc(k)}</td><td>${g.n}</td><td>${R(g.q)}</td><td>Rs ${R(g.inv)}</td><td>Rs ${R(g.mv)}</td><td class="${C(g.upl)}">Rs ${S(g.upl)}<br><small>${S(pp(g.upl,g.inv),2)}%</small></td><td><b>${R(pp(g.mv,d.mv),2)}%</b><div style="height:4px;background:var(--line);border-radius:4px"><div style="height:4px;width:${pp(g.mv,d.mv)}%;background:${pal[i%8]};border-radius:4px"></div></div></td></tr>`).join("");
+ $("sf").innerHTML=`<tr><td class="l">Total</td><td>${d.rows.length}</td><td>${R(d.rows.reduce((s,r)=>s+r.q,0))}</td><td>Rs ${R(d.inv)}</td><td>Rs ${R(d.mv)}</td><td class="${C(d.upl)}">Rs ${S(d.upl)}</td><td>100%</td></tr>`;
+ let a=0;const arcs=gs.map(([k,g],i)=>{const f=d.mv?g.mv/d.mv:0,x=a;a+=f;const p=t=>[60+50*Math.sin(t*6.2832),60-50*Math.cos(t*6.2832)];const[s1,s2]=p(x),[e1,e2]=p(a);return f>0?`<path d="M${s1} ${s2}A50 50 0 ${f>.5?1:0} 1 ${e1==s1&&e2==s2?e1-.01:e1} ${e2}" fill="none" stroke="${pal[i%8]}" stroke-width="20"/>`:""}).join("");
+ const mx=Math.max(1,...gs.map(([k,g])=>Math.max(g.inv,g.mv)));
+ const bars=gs.map(([k,g],i)=>`<g transform="translate(${i*70+20},0)"><rect x="0" y="${130-g.inv/mx*120}" width="20" height="${g.inv/mx*120}" fill="#2563eb"/><rect x="22" y="${130-g.mv/mx*120}" width="20" height="${g.mv/mx*120}" fill="#c9a84a"/><text x="21" y="145" font-size="9" text-anchor="middle" fill="currentColor">${esc(k.slice(0,10))}</text></g>`).join("");
+ $("ch").innerHTML=`<svg width="190" height="190" viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="none" stroke="var(--line)" stroke-width="20"/>${arcs}<text x="60" y="62" text-anchor="middle" font-size="18" font-weight="700" fill="currentColor">${gs.length}</text><text x="60" y="76" text-anchor="middle" font-size="7" fill="#888">SECTORS</text></svg>
+ <svg width="${Math.max(300,gs.length*70+40)}" height="160"><text x="0" y="10" font-size="10" fill="#2563eb">■ Investment</text><text x="80" y="10" font-size="10" fill="#c9a84a">■ Market Value</text><g transform="translate(0,6)">${bars}</g></svg>`;
+}
+window.srt=k=>{sortD=sortK==k?-sortD:-1;sortK=k;render()};
+/* ---- menus & modals ---- */
+const closeMenu=()=>{menuEl&&menuEl.remove();menuEl=null};document.addEventListener("click",e=>{if(!e.target.closest(".menu")&&!e.target.closest("button"))closeMenu()});
+window.menu=(e,s)=>{e.stopPropagation();closeMenu();const m=menuEl=document.createElement("div");m.className="menu";const r=e.target.getBoundingClientRect();m.style.left=r.left+scrollX+"px";m.style.top=r.bottom+scrollY+"px";
+ m.innerHTML=`<div style="color:var(--up)" data-a="buy">⊕ Buy more</div><div style="color:var(--dn)" data-a="sell">⊖ Sell</div><div style="color:var(--gold)" data-a="bonus">🎁 Bonus / rights</div><div style="color:var(--gold)" data-a="detail">▤ Transaction detail</div><div style="color:var(--dn)" data-a="del">🗑 Delete stock</div>`;
+ m.onclick=ev=>{const a=ev.target.dataset.a;closeMenu();if(a==="detail")detail(s);else if(a==="del")delStock(s);else entry(s,a)};document.body.appendChild(m)};
+const modal=h=>{$("mod").innerHTML=`<div class="ov" onclick="if(event.target===this)closeM()"><div class="md">${h}</div></div>`};window.closeM=()=>$("mod").innerHTML="";
+const kv=(a,b,c="",t="")=>`<div class="r ${t}"><span>${a}</span><b class="${c}">${b}</b></div>`;
+window.detail=(s,tab="sum")=>{closeMenu();const d=D,h=d.H[s],T=d.T[s]||[];if(!h)return;const ltp=(board[s]||{}).ltp;
+ const npl=h.pbt-h.cgt,top=`<div class="g">${[["Held",R(h.q)+" kitta"],["WACC","Rs "+R(h.q?h.c/h.q:0,2)],["Cost held","Rs "+R(h.c)],["Total charges","Rs "+R(h.chgB+h.chgS)],["Profit before tax","Rs "+R(h.pbt)],["Net profit / loss","Rs "+R(npl)]].map(x=>`<div class="k"><b>${x[0]}</b><div class="v">${x[1]}</div></div>`).join("")}</div>`;
+ const body=tab==="sum"?`<div class="two"><div class="panel"><b>POSITION</b>${kv("Bought",R(h.boughtQ)+" kitta · Rs "+R(h.bought,2))}${kv("Sold",R(h.soldQ)+" kitta · Rs "+R(h.sold,2))}${kv("Bonus / rights",R(h.bonusQ)+" kitta")}${kv("Net held",R(h.q)+" kitta","","t")}</div>
+ <div class="panel"><b>CHARGES</b>${kv("Charges on buys","Rs "+R(h.chgB,2))}${kv("Charges on sells","Rs "+R(h.chgS,2))}${kv("Total","Rs "+R(h.chgB+h.chgS,2),"","t")}${kv("Capital gains tax","Rs "+R(h.cgt,2))}</div>
+ <div class="panel"><b>PROFIT &amp; LOSS</b>${kv("Sell proceeds (gross)","Rs "+R(h.sold,2))}${kv("− Charges on sells","Rs "+R(h.chgS,2))}${kv("− Cost of shares sold","Rs "+R(h.sold-h.chgS-h.pbt,2))}${kv("= Profit before tax","Rs "+R(h.pbt,2),C(h.pbt),"t")}${kv("− Capital gains tax","Rs "+R(h.cgt,2))}${kv("= Net profit / loss","Rs "+R(npl,2),C(npl),"t")}</div>
+ <div class="panel"><b>COST BASIS</b>${kv("Buys (gross)","Rs "+R(h.bought,2))}${kv("+ Charges on buys","Rs "+R(h.chgB,2))}${kv("− Cost removed by sells","Rs "+R(h.sold-h.chgS-h.pbt,2))}${kv("= Cost basis still held","Rs "+R(h.c,2),"","t")}${kv("÷ Quantity held",R(h.q)+" kitta")}${kv("= WACC","Rs "+R(h.q?h.c/h.q:0,2),"","t")}</div></div>`
+ :`<div class="tw"><table><thead><tr><th class="l">DATE</th><th>TYPE</th><th>QTY</th><th>RATE</th><th>GROSS</th><th>CHARGES</th><th>CGT</th><th>CUM COST</th><th>HELD</th><th>WACC</th><th></th></tr></thead><tbody>${T.map(t=>`<tr><td class="l">${esc(t.date)}</td><td class="${t.side=="buy"?"up":"dn"}"><b>${t.side.toUpperCase()}${t.price===0?" (bonus)":""}</b></td><td>${R(t.qty)}</td><td>${R(t.price,2)}</td><td>${R(t.gross,2)}</td><td>${R(t.chg,2)}</td><td>${t.cgt?R(t.cgt,2):"—"}</td><td>${R(t.cum,2)}</td><td>${R(t.held)}</td><td>${R(t.wacc,2)}</td><td><button onclick="delTx('${t.id}')" style="padding:2px 8px">✕</button></td></tr>`).join("")}</tbody></table></div>`;
+ modal(`<div class="bar"><h3>${s}</h3><span class="mut">Transaction detail · ${esc(cur$().name)}</span><span class="sp"></span><button onclick="closeM()">✕</button></div>${top}<div class="tabs"><span class="${tab=="sum"?"on":""}" onclick="detail('${s}','sum')">Summary</span><span class="${tab=="tx"?"on":""}" onclick="detail('${s}','tx')">Transactions</span></div>${body}<div class="bar"><span class="mut">Commission slabs, SEBON 0.015% and DP Rs 25 are auto-calculated unless you override charges.</span><span class="sp"></span><button class="solid" onclick="closeM()">Done</button></div>`)};
+window.realized=kind=>{const d=D;let E=d.ev;if(kind==="profit")E=E.filter(e=>e.net>0);if(kind==="loss")E=E.filter(e=>e.net<0);
+ const day={};E.forEach(e=>{const x=day[e.date]=day[e.date]||{date:e.date,v:0,n:0,s:new Set()};x.v+=e.net;x.n++;x.s.add(e.s)});const L=Object.values(day).sort((a,b)=>b.date.localeCompare(a.date)),big=L.reduce((m,x)=>Math.abs(x.v)>Math.abs(m.v||0)?x:m,{});
+ const cs=[["Realized profit",d.rp],["Realized loss",d.rl],["Net realized",d.nr],["Total CGT paid",d.cgt],["Broker+charges on sells",d.comm],["Total dividend",d.divs]];
+ modal(`<div class="bar"><h3>${kind==="loss"?"Realized loss":kind==="net"?"Net realized P/L":"Realized profit"}</h3><span class="mut">Daily breakdown — grouped by day</span><span class="sp"></span><button onclick="closeM()">✕</button></div>
+ <div class="g">${cs.map(c=>`<div class="k"><b>${c[0]}</b><div class="v">Rs ${R(c[1])}</div></div>`).join("")}</div>
+ <div class="g" style="margin:10px 0"><div class="k"><b>Total</b><div class="v">Rs ${R(E.reduce((s,e)=>s+e.net,0))}</div></div><div class="k"><b>Active days</b><div class="v">${L.length}</div></div><div class="k"><b>Avg / active day</b><div class="v">Rs ${R(L.length?E.reduce((s,e)=>s+e.net,0)/L.length:0)}</div></div><div class="k"><b>Biggest day · ${big.date||"—"}</b><div class="v">Rs ${R(big.v||0)}</div></div></div>
+ <div class="tw"><table><thead><tr><th class="l">DATE</th><th>REALIZED</th><th>TRADES</th><th class="l">SYMBOLS</th></tr></thead><tbody>${L.map(x=>`<tr><td class="l">${x.date}</td><td class="${C(x.v)}"><b>Rs ${R(x.v)}</b></td><td>${x.n}</td><td class="l">${[...x.s].join(", ")}</td></tr>`).join("")||`<tr><td colspan=4 class="mut">No sells in this period.</td></tr>`}</tbody></table></div>
+ <div class="bar"><span class="mut">Totals reflect the selected period. Net = profit before tax − CGT.</span><span class="sp"></span><button class="solid" onclick="closeM()">Done</button></div>`)};
+window.entry=(sym="",kind="buy")=>{const bonus=kind==="bonus";
+ modal(`<div class="bar"><h3>${bonus?"Bonus / rights":kind==="sell"?"Sell":"Buy"} entry</h3><span class="sp"></span><button onclick="closeM()">✕</button></div>
+ <form class="f" id="ef"><div><label>Symbol</label><input name="s" value="${sym}" style="text-transform:uppercase" required></div>
+ <div><label>Type</label><select name="k"><option value="buy" ${kind==="buy"?"selected":""}>Buy</option><option value="sell" ${kind==="sell"?"selected":""}>Sell</option><option value="bonus" ${bonus?"selected":""}>Bonus shares (Rs 0)</option><option value="rights">Rights shares</option></select></div>
+ <div><label>Quantity (kitta)</label><input name="q" type="number" min="1" required></div><div><label>Rate (Rs)</label><input name="p" type="number" step="0.01" min="0" value="${bonus?0:""}"></div>
+ <div><label>Date (AD)</label><input name="d" type="date" value="${new Date().toISOString().slice(0,10)}" required></div>
+ <div><label>Total charges override (optional)</label><input name="f" type="number" step="0.01" placeholder="auto: commission + SEBON + DP"></div>
+ <div style="grid-column:1/-1" id="pv" class="mut"></div><div style="grid-column:1/-1"><button class="solid" type="submit">Save entry</button></div></form>`);
+ const f=$("ef"),pv=()=>{const q=+f.q.value,p=+f.p.value,g=q*p;pv_.textContent=q&&p?`Gross Rs ${R(g,2)} · est. charges Rs ${R(comm(g)+g*CFG.sebon+CFG.dp,2)}`:""},pv_=$("pv");f.oninput=pv;
+ f.onsubmit=async e=>{e.preventDefault();let k=f.k.value;const t={id:newId(),symbol:f.s.value.trim().toUpperCase(),side:k==="sell"?"sell":"buy",qty:+f.q.value,price:k==="bonus"?0:+f.p.value,date:f.d.value,fees:f.f.value===""?null:+f.f.value,note:k==="bonus"?"Bonus":k==="rights"?"Rights":"",auto:f.f.value===""};
+ if(k==="sell"){const h=D.H[t.symbol];if(!h||h.q<t.qty){alert("You hold "+(h?h.q:0)+" kitta of "+t.symbol+" — can't sell "+t.qty);return}}
+ cur$().transactions.push(t);await save();closeM();render()}};
+$("addTx").onclick=()=>entry();
+window.delTx=async id=>{if(!confirm("Delete this transaction? Holdings recalculate automatically."))return;const p=cur$();p.transactions=p.transactions.filter(t=>t.id!=id);await save();render();closeM()};
+window.delStock=async s=>{if(!confirm(`Delete ALL transactions of ${s} from "${cur$().name}"? A backup file downloads first.`))return;backup();const p=cur$();p.transactions=p.transactions.filter(t=>t.symbol.toUpperCase()!==s);await save();render()};
+function backup(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify({exportedAt:new Date().toISOString(),portfolios:PF},null,2)],{type:"application/json"}));a.download="portfolio-backup-"+Date.now()+".json";a.click()}
+/* ---- data ---- */
+async function save(){localStorage.setItem("ee_portfoliosV2_"+uid,JSON.stringify(PF));$("stat").textContent="saving…";
+ const{error}=await sb.from("portfolio_data").upsert({user_id:uid,portfolios:PF,current_portfolio_id:cur,schema_version:2,updated_at:new Date().toISOString()},{onConflict:"user_id"});$("stat").textContent=error?"⚠ "+error.message:"synced ✓"}
+async function prices(){try{const j=await(await fetch(WORKER+"/all")).json();board={};(j.board||[]).forEach(r=>r.symbol&&(board[r.symbol.toUpperCase()]=r));$("stat").textContent="live · "+new Date().toLocaleTimeString()}catch(e){$("stat").textContent="price feed failed"}render()}
+async function boot(id){uid=id;$("gate").hidden=true;$("app").hidden=false;
+ const{data,error}=await sb.from("portfolio_data").select("portfolios,current_portfolio_id").eq("user_id",uid).maybeSingle();
+ if(error||!data||!data.portfolios?.length){try{PF=JSON.parse(localStorage.getItem("ee_portfoliosV2_"+uid))||[]}catch(e){PF=[]}if(!PF.length)PF=[{id:newId(),name:"My Portfolio",transactions:[],watchlist:[],alerts:[],dividends:[]}];cur=PF[0].id}
+ else{PF=data.portfolios;cur=PF.find(p=>p.id===data.current_portfolio_id)?data.current_portfolio_id:PF[0].id}
+ PF.forEach(p=>{p.transactions=p.transactions||[];p.dividends=p.dividends||[]});
+ const fill=()=>$("pf").innerHTML=PF.map(p=>`<option value="${p.id}" ${p.id===cur?"selected":""}>${esc(p.name)}</option>`).join("")+`<option value="__new">＋ Create portfolio…</option>`;fill();
+ $("pf").onchange=async e=>{if(e.target.value==="__new"){const n=prompt("Portfolio name");if(n){const p={id:newId(),name:n,transactions:[],watchlist:[],alerts:[],dividends:[]};PF.push(p);cur=p.id;await save()}}else cur=e.target.value;fill();render()};
+ await prices();setInterval(prices,30000)}
+$("fs").onchange=$("fc").onchange=$("per").onchange=render;$("clr").onclick=()=>{$("fs").value="";$("fc").value="";render()};
+$("login").onclick=async()=>{const{data,error}=await sb.auth.signInWithPassword({email:$("em").value.trim(),password:$("pw").value});if(error)$("gm").textContent=error.message;else boot(data.user.id)};
+$("out").onclick=()=>sb.auth.signOut().then(()=>location.reload());
+sb.auth.getSession().then(({data})=>data.session?boot(data.session.user.id):$("gate").hidden=false);
+</script></body></html>
